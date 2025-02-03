@@ -36,6 +36,7 @@ rich==13.9.4
 rich-toolkit==0.13.2
 shellingham==1.5.4
 sniffio==1.3.1
+SQLAlchemy==2.0.37
 stack-data==0.6.3
 starlette==0.45.3
 traitlets==5.14.3
@@ -46,4 +47,3 @@ uvloop==0.21.0
 watchfiles==1.0.4
 wcwidth==0.2.13
 websockets==14.2
-
