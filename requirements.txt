@@ -15,6 +15,7 @@ httptools==0.6.4
 httpx==0.28.1
 idna==3.10
 ipython==8.32.0
+itsdangerous==2.2.0
 jedi==0.19.2
 Jinja2==3.1.5
 markdown-it-py==3.0.0
@@ -22,6 +23,7 @@ MarkupSafe==3.0.2
 matplotlib-inline==0.1.7
 mdurl==0.1.2
 parso==0.8.4
+passlib==1.7.4
 pexpect==4.9.0
 prompt_toolkit==3.0.50
 ptyprocess==0.7.0

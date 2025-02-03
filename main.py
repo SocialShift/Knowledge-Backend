@@ -7,7 +7,8 @@ app= FastAPI()
 
 
 Base.metadata.create_all(bind=engine)
-app.include_router()
+
+app.include_router(users.router)
 
 
 if __name__== "__main__":
