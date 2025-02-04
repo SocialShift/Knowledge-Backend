@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from routers import users, contacts, organizations, products
+#from fastapi.middleware.cors import CORSMiddleware
+#from starlette.middleware.sessions import SessionMiddleware
+from routers import users#, contacts, organizations, products
 from db.models import engine, Base
 app= FastAPI()
 
