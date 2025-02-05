@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from db.models import User, get_db
 from typing import Optional
 
+SECRET_KEY=  "enter-your-secret-key"
 
 async def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     user_id = request.session.get("user_id")
@@ -23,7 +24,7 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
 
 def create_session(request: Request, user: User):
     request.session["user_id"] = user.id
-    request.session["username"] = user.username
+    request.session["email"] = user.email
 
 def end_session(request: Request):
     request.session.clear()

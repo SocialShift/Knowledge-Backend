@@ -73,7 +73,7 @@ async def delete_user(current_user: User = Depends(get_current_user), db: Sessio
     return JSONResponse({'detail': "User deleted"}, status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/login", response_model=UserResponse)
+@router.post("/login")
 async def login(request: Request, data: LoginModel, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     
@@ -102,21 +102,27 @@ async def logout(request: Request, current_user: User = Depends(get_current_user
 
 
 
-@router.patch("/profile/update", response_model=UserResponse)
-async def update_profile(profile_data: ProfileUpdate, current_user: User= Depends(get_current_user), db: Session = Depends(get_db)):
-    profile= db.query(Profile).filter(Profile.user_id == current_user.id)
+@router.patch("/profile/update", response_model=ProfileUpdate)
+async def update_profile(
+    profile_data: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # ✅ Fix: Use `.first()` to get the actual Profile instance
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
 
-    if  not profile:
-        return HTTPException(status_code=404, detail="Profile not found")
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
     
-    # Update only the fields that were provided in the request
-    update_data = profile_data.dict(exclude_unset=True)  # This will exclude fields that are not provided
+    # ✅ Only update fields that are provided in the request
+    update_data = profile_data.dict(exclude_unset=True)  
 
-    # Apply the updates directly
+    # ✅ Apply updates dynamically
     for key, value in update_data.items():
         setattr(profile, key, value)
 
-    # Save changes to the DB
+    # ✅ Save changes to the DB
     db.commit()
     db.refresh(profile)
-    return current_user
+
+    return update_data  # Uses `UserResponse` for structured output
