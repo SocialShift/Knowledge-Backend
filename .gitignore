@@ -1,3 +1,7 @@
 .DS_Store
 .env
 env/
+utils/__pycache__
+schemas/__pycache__
+routers/__pycache__
+db/__pycache__
