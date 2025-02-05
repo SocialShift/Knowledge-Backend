@@ -1,7 +1,7 @@
 from fastapi import APIRouter,Depends,Request, HTTPException,status
 from db.models import get_db,User,Profile
 from sqlalchemy.orm import Session
-from schemas.users import UserCreateModel, LoginModel
+from schemas.users import UserCreateModel, LoginModel,UserResponse,ProfileUpdate
 from fastapi.responses import JSONResponse
 
 
@@ -9,7 +9,7 @@ from utils.auth import get_current_user, create_session, end_session
 
 router= APIRouter(prefix="/api/auth")
 
-@router.post('/create-user')
+@router.post('/create-user', response_class=UserResponse)
 async def create_user(request: Request, data: UserCreateModel, db: Session = Depends(get_db)):
     if data.password != data.confirm_password:
         raise HTTPException(
@@ -73,7 +73,7 @@ async def delete_user(current_user: User = Depends(get_current_user), db: Sessio
     return JSONResponse({'detail': "User deleted"}, status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/login")
+@router.post("/login", response_model=UserResponse)
 async def login(request: Request, data: LoginModel, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     
@@ -99,3 +99,24 @@ async def login(request: Request, data: LoginModel, db: Session = Depends(get_db
 async def logout(request: Request, current_user: User = Depends(get_current_user)):
     end_session(request)
     return {"message": "Logged out successfully"}
+
+
+
+@router.patch("/profile/update", response_model=UserResponse)
+async def update_profile(profile_data: ProfileUpdate, current_user: User= Depends(get_current_user), db: Session = Depends(get_db)):
+    profile= db.query(Profile).filter(Profile.user_id == current_user.id)
+
+    if  not profile:
+        return HTTPException(status_code=404, detail="Profile not found")
+    
+    # Update only the fields that were provided in the request
+    update_data = profile_data.dict(exclude_unset=True)  # This will exclude fields that are not provided
+
+    # Apply the updates directly
+    for key, value in update_data.items():
+        setattr(profile, key, value)
+
+    # Save changes to the DB
+    db.commit()
+    db.refresh(profile)
+    return current_user
