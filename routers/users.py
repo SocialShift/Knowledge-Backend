@@ -126,3 +126,12 @@ async def update_profile(
     db.refresh(profile)
 
     return update_data  # Uses `UserResponse` for structured output
+
+
+@router.get("/user/me")
+async def profile(current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
+    my_profile= db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not my_profile:
+        return HTTPException(detail="User Not Found", status_code=status.HTTP_404_NOT_FOUND)
+    
+    return my_profile
