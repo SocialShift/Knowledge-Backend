@@ -9,7 +9,7 @@ from utils.auth import get_current_user, create_session, end_session
 
 router= APIRouter(prefix="/api/auth")
 
-@router.post('/create-user', response_class=UserResponse)
+@router.post('/create-user')
 async def create_user(request: Request, data: UserCreateModel, db: Session = Depends(get_db)):
     if data.password != data.confirm_password:
         raise HTTPException(
@@ -102,7 +102,7 @@ async def logout(request: Request, current_user: User = Depends(get_current_user
 
 
 
-@router.patch("/profile/update", response_model=ProfileUpdate)
+@router.patch("/profile/update")
 async def update_profile(
     profile_data: ProfileUpdate,
     current_user: User = Depends(get_current_user),
