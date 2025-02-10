@@ -30,7 +30,6 @@ class ProfileUpdate(BaseModel):
     language_preference: str= None
     pronouns: str= None
     location: str= None
-    learning_style: dict= None
-    accessibility_settings: dict= None
+    personalization_questions: dict= None
 
 #class UserModel

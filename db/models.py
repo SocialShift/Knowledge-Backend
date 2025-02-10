@@ -7,7 +7,7 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_7xen_user:a4izvptoKoVChnccF9Ix9AbVcMOnp7n4@dpg-cuicug5ds78s73e0ee8g-a.oregon-postgres.render.com/knowledge_7xen"
+DATABASE_URL = "postgresql://knowledge_k18a_user:8vY2XYI72VnYDQ7VQRXAV1VXMDQVN8Gd@dpg-cukvdkq3esus73b14hk0-a.oregon-postgres.render.com/knowledge_k18a"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -39,10 +39,56 @@ class Pronouns(str, enum.Enum):
     OTHER = "Other"
 
 class Location(str, enum.Enum):
-    USA_EAST = "East Coast"
-    USA_WEST = "West Coast"
-    USA_CENTRAL = "Central"
-    USA_SOUTH = "South"
+    ALABAMA = "Alabama"
+    ALASKA = "Alaska"
+    ARIZONA = "Arizona"
+    ARKANSAS = "Arkansas"
+    CALIFORNIA = "California"
+    COLORADO = "Colorado"
+    CONNECTICUT = "Connecticut"
+    DELAWARE = "Delaware"
+    FLORIDA = "Florida"
+    GEORGIA = "Georgia"
+    HAWAII = "Hawaii"
+    IDAHO = "Idaho"
+    ILLINOIS = "Illinois"
+    INDIANA = "Indiana"
+    IOWA = "Iowa"
+    KANSAS = "Kansas"
+    KENTUCKY = "Kentucky"
+    LOUISIANA = "Louisiana"
+    MAINE = "Maine"
+    MARYLAND = "Maryland"
+    MASSACHUSETTS = "Massachusetts"
+    MICHIGAN = "Michigan"
+    MINNESOTA = "Minnesota"
+    MISSISSIPPI = "Mississippi"
+    MISSOURI = "Missouri"
+    MONTANA = "Montana"
+    NEBRASKA = "Nebraska"
+    NEVADA = "Nevada"
+    NEW_HAMPSHIRE = "New Hampshire"
+    NEW_JERSEY = "New Jersey"
+    NEW_MEXICO = "New Mexico"
+    NEW_YORK = "New York"
+    NORTH_CAROLINA = "North Carolina"
+    NORTH_DAKOTA = "North Dakota"
+    OHIO = "Ohio"
+    OKLAHOMA = "Oklahoma"
+    OREGON = "Oregon"
+    PENNSYLVANIA = "Pennsylvania"
+    RHODE_ISLAND = "Rhode Island"
+    SOUTH_CAROLINA = "South Carolina"
+    SOUTH_DAKOTA = "South Dakota"
+    TENNESSEE = "Tennessee"
+    TEXAS = "Texas"
+    UTAH = "Utah"
+    VERMONT = "Vermont"
+    VIRGINIA = "Virginia"
+    WASHINGTON = "Washington"
+    WEST_VIRGINIA = "West Virginia"
+    WISCONSIN = "Wisconsin"
+    WYOMING = "Wyoming"
 
 
 # User Model
@@ -82,10 +128,8 @@ class Profile(Base):
     location= Column(Enum(Location, native_enum=False), nullable=True)
 
     # Learning Style
-    learning_style= Column(JSON, nullable=True)
+    personalization_questions= Column(JSON, nullable=True)
 
-    # Accessibility
-    accessibility_settings= Column(JSON, nullable=True)
 
     user= relationship("User", back_populates="profile")
 
