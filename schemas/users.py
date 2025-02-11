@@ -33,3 +33,16 @@ class ProfileUpdate(BaseModel):
     personalization_questions: dict= None
 
 #class UserModel
+    
+class UserEmailUpdate(BaseModel):
+    email: EmailStr
+
+
+class UserPasswordChange(BaseModel):
+    current_password: str 
+    new_password: str 
+    confirm_new_password: str= Field(exclude=True)
+
+class UserPasswordForgot(BaseModel):
+    new_password: str 
+    confirm_new_password: str

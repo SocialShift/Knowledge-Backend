@@ -1,9 +1,9 @@
 from fastapi import APIRouter,Depends,Request, HTTPException,status
 from db.models import get_db,User,Profile
 from sqlalchemy.orm import Session
-from schemas.users import UserCreateModel, LoginModel,UserResponse,ProfileUpdate
+from schemas.users import UserCreateModel, LoginModel,UserResponse,ProfileUpdate,UserEmailUpdate, UserPasswordChange
 from fastapi.responses import JSONResponse
-
+from db.models import pwd_context
 
 from utils.auth import get_current_user, create_session, end_session
 
@@ -135,3 +135,64 @@ async def profile(current_user: User = Depends(get_current_user),db: Session = D
         return HTTPException(detail="User Not Found", status_code=status.HTTP_404_NOT_FOUND)
     
     return my_profile
+
+
+@router.patch("/profile/update/user-email")
+async def update_user_profile(
+    data: UserEmailUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    my_user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not my_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
+
+    # Update the email
+    my_user.email = data.email
+
+    db.commit()
+    db.refresh(my_user)
+
+    return {"message": "Email updated successfully", "email": my_user.email}
+
+
+@router.post('/change-password')
+async def change_password(
+    data: UserPasswordChange, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    # Fetch the user instance
+    my_user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not my_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User Not Found"
+        )
+    
+    # Verify current password
+    if not pwd_context.verify(data.current_password, my_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect password"
+        )
+
+    # Check if new passwords match
+    if data.new_password != data.confirm_new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password and Confirm Password didn't match"
+        )
+
+    # Hash new password and update user
+    my_user.password = pwd_context.hash(data.new_password)
+    
+    db.commit()
+    db.refresh(my_user)
+
+    return {"message": "Password changed successfully."}
