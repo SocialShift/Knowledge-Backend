@@ -19,6 +19,11 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
+    elif not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account de-activated"
+        )   
     
     return user
 

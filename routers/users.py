@@ -1,7 +1,7 @@
 from fastapi import APIRouter,Depends,Request, HTTPException,status
 from db.models import get_db,User,Profile
 from sqlalchemy.orm import Session
-from schemas.users import UserCreateModel, LoginModel,UserResponse,ProfileUpdate,UserEmailUpdate, UserPasswordChange
+from schemas.users import UserCreateModel, LoginModel,ProfileUpdate,UserEmailUpdate, UserPasswordChange
 from fastapi.responses import JSONResponse
 from db.models import pwd_context
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, JSON, ForeignKey, create_engine
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, JSON, ForeignKey, create_engine,Text,Date
 from sqlalchemy.orm import relationship, declarative_base, sessionmaker
 from datetime import datetime
 from passlib.context import CryptContext
@@ -100,6 +100,7 @@ class User(Base):
     password= Column(String(255), nullable=False)
     joined_at= Column(DateTime, default=datetime.now())
     is_active= Column(Boolean, default=True)
+    is_admin= Column(Boolean, default=False)
 
     # Relationship with Profile
     profile= relationship("Profile", uselist=False, back_populates="user", cascade="all, delete-orphan")
@@ -143,3 +144,59 @@ class Profile(Base):
     @staticmethod
     def create_random():
         return "".join([str(random.randint(0, 9)) for _ in range(6)])
+
+class OnThisDay(Base):
+    __tablename__ = "on_this_day"
+
+    id = Column(Integer, primary_key=True)
+    date = Column(Date, nullable=False, unique=True)  # Ensures unique historical events per date
+    title = Column(String(255), nullable=False)  # Catchy notification title
+    short_desc = Column(Text, nullable=False)  # Hook message for the user
+    image_url = Column(String(255), nullable=True)  # Optional image for the event
+    story_id = Column(Integer, ForeignKey("stories.id", ondelete="SET NULL"), nullable=True)  # Links to a Story
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship
+    story = relationship("Story", back_populates="on_this_day")  # Connects to Story
+
+
+class Timeline(Base):
+    __tablename__ = "timelines"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(255), nullable=False, unique=True)  # Example: "Mahatma Gandhi's Role in Independence"
+    thumbnail_url = Column(String(255), unique=True)
+    year_range = Column(String(50), nullable=False)
+    overview = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationship with Stories
+    stories = relationship("Story", back_populates="timeline", cascade="all, delete-orphan")
+
+class Timestamp(Base):
+    __tablename__ = "timestamps"
+
+    id = Column(Integer, primary_key=True)
+    story_id = Column(Integer, ForeignKey("stories.id", ondelete="CASCADE"))
+    time_sec = Column(Integer, nullable=False)  # Timestamp in seconds
+    label = Column(String(100))  # Optional: Label for the timestamp (e.g., "Chapter 1")
+
+    story = relationship("Story", back_populates="timestamps")
+
+
+class Story(Base):
+    __tablename__ = "stories"
+
+    id = Column(Integer, primary_key=True)
+    timeline_id = Column(Integer, ForeignKey("timelines.id", ondelete="CASCADE"), nullable=True)  # Links to Timeline
+    title = Column(String(100), nullable=False)
+    desc = Column(Text)
+    thumbnail_url = Column(String(255), unique=True)
+    video_url = Column(String(255), unique=True)
+    likes = Column(Integer, default=0)
+    views = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    timeline = relationship("Timeline", back_populates="stories")
+    on_this_day = relationship("OnThisDay", back_populates="story", uselist=False)
+    timestamps = relationship("Timestamp", back_populates="story", cascade="all, delete-orphan")
