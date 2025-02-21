@@ -7,7 +7,7 @@ class OnThisDayCreateModel(BaseModel):
     date: date
     title: str
     short_desc: str
-    image_url: Optional[HttpUrl] = None
+    image_url: str = None
     story_id: Optional[int] = None  # Can be linked to a Story
 
 class OnThisDayResponseModel(OnThisDayCreateModel):

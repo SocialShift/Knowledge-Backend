@@ -2,7 +2,7 @@ from fastapi import APIRouter,HTTPException,Depends,status
 from schemas.stories_timelines import TimelineCreateModel,StoryCreateModel,OnThisDayCreateModel,OnThisDayResponseModel
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay
+from db.models import User, Timeline, Story, OnThisDay,Timestamp
 from utils.auth import get_current_user
 from fastapi.responses import JSONResponse
 from datetime import date
@@ -13,8 +13,9 @@ router= APIRouter(
 
 @router.post('/otd/create')
 async def create_otd(data: OnThisDayCreateModel,  db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    if not current_user.is_admin:
-        raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
+    print(current_user.is_admin)
+    #if not current_user.is_admin:
+       #raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
     
     new_otd_obj= OnThisDay(
         date= data.date,
@@ -57,8 +58,8 @@ def delete_otd(id: int, db: Session = Depends(get_db)):
 
 @router.post("/timeline/create")
 async def create_timeline(data: TimelineCreateModel, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    if not current_user.is_admin:
-        raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
+    #if not current_user.is_admin:
+        #raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
     
     new_timeline= Timeline(
         title= data.title,
@@ -96,8 +97,8 @@ async def update_timeline(timeline_id: int, data: TimelineCreateModel, db: Sessi
     if not timeline_obj:
         raise HTTPException(detail="TimeLine Not Found", status_code=status.HTTP_404_NOT_FOUND)
     
-    if not current_user.is_admin:
-        raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
+    #if not current_user.is_admin:
+        #raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
     
     for field, value in data.dict(exclude_unset=True).items():
         setattr(timeline_obj, field, value)
@@ -120,8 +121,8 @@ async def delete_timeline(timeline_id: int, db: Session= Depends(get_db), curren
     if not timeline_obj:
         raise HTTPException(detail="Timeline obj not found", status_code=status.HTTP_404_NOT_FOUND)
 
-    if not current_user.is_admin:
-        raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
+    #if not current_user.is_admin:
+        #raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
     
     db.delete(timeline_obj)
     try:
@@ -138,28 +139,41 @@ async def delete_timeline(timeline_id: int, db: Session= Depends(get_db), curren
 
 
 @router.post("/{timeline}/story/create")
-async def create_story(timeline: int, data: StoryCreateModel, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    if not current_user.is_admin:
-        raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
-    current_timeline= db.query(Timeline).filter(Timeline.id == timeline).first()
+async def create_story(
+    timeline: int, 
+    data: StoryCreateModel, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Check if the timeline exists
+    current_timeline = db.query(Timeline).filter(Timeline.id == timeline).first()
     if not current_timeline:
         raise HTTPException(detail="Timeline not found", status_code=status.HTTP_404_NOT_FOUND)
-    
-    new_story= Story(
-        title= data.title,
-        desc= data.desc,
-        thumbnail_url= data.thumbnail_url,
-        video_url= data.video_url,
-        timeline_id=  current_timeline.id,
-        timestamps= data.timestamps
+
+    # Create Story instance (without timestamps yet)
+    new_story = Story(
+        title=data.title,
+        desc=data.desc,
+        thumbnail_url=data.thumbnail_url,
+        video_url=data.video_url,
+        timeline_id=current_timeline.id  # Use `id`, not object reference
     )
     db.add(new_story)
-    try:
+    db.commit()
+    db.refresh(new_story)  # Ensure the story is committed before adding timestamps
+
+    # Convert timestamps from Pydantic to SQLAlchemy models
+    timestamp_objects = [
+        Timestamp(story_id=new_story.id, time_sec=ts.time_sec, label=ts.label)
+        for ts in data.timestamps
+    ]
+
+    # Add timestamps only if they exist
+    if timestamp_objects:
+        db.add_all(timestamp_objects)
         db.commit()
-        db.refresh(new_story)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+
+    return new_story
 
 @router.get('/story/{story_id}')
 async def get_story(story_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
@@ -167,45 +181,65 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
 
     if not story:
         raise HTTPException(detail="Story not found", status_code=status.HTTP_404_NOT_FOUND)
-    return story
+    return story,story.timestamps
 
 @router.get('/list/stories')
 async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    all_stories= db.query(Story).order_by(Story.timeline_id, Story.id)
+    all_stories= db.query(Story).all()
     return all_stories
 
 @router.get('/timeline/{timeline_id}/stories')
 async def get_stories_of_timeline(timeline_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    get_stories= db.query(Story).filter(Story.timeline_id == timeline_id)
+    get_stories= db.query(Story).filter(Story.timeline_id == timeline_id).all()
     return get_stories
 
 @router.patch('/story/update/{story_id}')
-async def update_story(story_id: int, data: StoryCreateModel, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    story_obj= db.query(Story).filter(Story.id == story_id).first()
+async def update_story(
+    story_id: int, 
+    data: StoryCreateModel, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch the existing story
+    story_obj = db.query(Story).filter(Story.id == story_id).first()
     if not story_obj:
-        raise HTTPException(detail="Story Updated", status_code=status.HTTP_404_NOT_FOUND)
-    if not current_user.is_admin:
-        raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
-    
+        raise HTTPException(detail="Story not found", status_code=status.HTTP_404_NOT_FOUND)
 
-    for field, value in data.dict(exclude_unset=True).items():
+    # if not current_user.is_admin:
+    #     raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
+
+    # Update Story Fields (excluding timestamps for now)
+    update_data = data.dict(exclude_unset=True, exclude={"timestamps"})  # Exclude timestamps from direct update
+    for field, value in update_data.items():
         setattr(story_obj, field, value)
-    
+
+    # Handle timestamps separately if they are provided
+    if data.timestamps is not None:
+        # Delete existing timestamps for this story
+        db.query(Timestamp).filter(Timestamp.story_id == story_obj.id).delete()
+
+        # Insert new timestamps
+        new_timestamps = [
+            Timestamp(story_id=story_obj.id, time_sec=ts.time_sec, label=ts.label)
+            for ts in data.timestamps
+        ]
+        db.add_all(new_timestamps)
+
     try:
         db.commit()
         db.refresh(story_obj)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return JSONResponse(
-        {'detail': 'Timeline updated successfully'},
+        {'detail': 'Story updated successfully'},
         status_code=status.HTTP_200_OK
     )
 
-@router.delete("/story/delete/{timeline_id}")
-async def delete_story(timeline_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    story_obj= db.query(Timeline).filter(Timeline.id == timeline_id).first()
+@router.delete("/story/delete/{story_id}")
+async def delete_story(story_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
+    story_obj= db.query(Story).filter(Story.id == story_id).first()
     if not story_obj:
         raise HTTPException(detail="Story obj not found", status_code=status.HTTP_404_NOT_FOUND)
 
