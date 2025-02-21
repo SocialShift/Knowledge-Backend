@@ -32,7 +32,7 @@ async def create_otd(data: OnThisDayCreateModel,  db: Session= Depends(get_db), 
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     
-@router.get("/", response_model=list[OnThisDayResponseModel])
+@router.get("/list/otd", response_model=list[OnThisDayResponseModel])
 def get_all_otd(db: Session = Depends(get_db)):
     return db.query(OnThisDay).all()
 

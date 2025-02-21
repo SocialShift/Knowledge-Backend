@@ -1,7 +1,5 @@
 from fastapi import FastAPI
-#from fastapi.middleware.cors import CORSMiddleware
-#from starlette.middleware.sessions import SessionMiddleware
-from routers import users#, contacts, organizations, products
+from routers import users, stories_timelines
 from db.models import engine, Base
 from utils.auth import SECRET_KEY
 
@@ -30,6 +28,7 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 app.include_router(users.router)
+app.include_router(stories_timelines.router)
 
 
 if __name__== "__main__":
