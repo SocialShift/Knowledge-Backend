@@ -108,24 +108,22 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # ✅ Fix: Use `.first()` to get the actual Profile instance
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
-
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
+
+    update_data = profile_data.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    # ✅ Efficient bulk update
+    db.query(Profile).filter(Profile.user_id == current_user.id).update(update_data)
     
-    # ✅ Only update fields that are provided in the request
-    update_data = profile_data.dict(exclude_unset=True)  
-
-    # ✅ Apply updates dynamically
-    for key, value in update_data.items():
-        setattr(profile, key, value)
-
-    # ✅ Save changes to the DB
     db.commit()
     db.refresh(profile)
 
-    return update_data  # Uses `UserResponse` for structured output
+    return profile  # Return full profile after update
 
 
 @router.get("/user/me")

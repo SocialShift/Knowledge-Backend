@@ -1,5 +1,5 @@
 from fastapi import APIRouter,HTTPException,Depends,status
-from schemas.stories_timelines import TimelineCreateModel,StoryCreateModel,OnThisDayCreateModel,OnThisDayResponseModel
+from schemas.stories_timelines import TimelineCreateModel,StoryCreateModel,OnThisDayCreateModel,OnThisDayResponseModel,TimelineUpdateModel,StoryUpdateModel
 from db.models import get_db
 from sqlalchemy.orm import Session
 from db.models import User, Timeline, Story, OnThisDay,Timestamp
@@ -92,24 +92,43 @@ async def get_timelines(db: Session= Depends(get_db), current_user: User= Depend
     return timelines
 
 @router.patch('/timeline/update/{timeline_id}')
-async def update_timeline(timeline_id: int, data: TimelineCreateModel, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    timeline_obj= db.query(Timeline).filter(Timeline.id == timeline_id).first()
+async def update_timeline(
+    timeline_id: int, 
+    data: TimelineUpdateModel, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    timeline_query = db.query(Timeline).filter(Timeline.id == timeline_id)
+
+    # Check if timeline exists
+    timeline_obj = timeline_query.first()
     if not timeline_obj:
-        raise HTTPException(detail="TimeLine Not Found", status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Timeline Not Found"
+        )
     
-    #if not current_user.is_admin:
-        #raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
-    
-    for field, value in data.dict(exclude_unset=True).items():
-        setattr(timeline_obj, field, value)
-    
+    # if not current_user.is_admin:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_401_UNAUTHORIZED, 
+    #         detail="Only for admin"
+    #     )
+
+    update_data = data.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="No valid fields to update"
+        )
+
     try:
+        timeline_query.update(update_data, synchronize_session=False)
         db.commit()
-        db.refresh(timeline_obj)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return JSONResponse(
         {'detail': 'Timeline updated successfully'},
         status_code=status.HTTP_200_OK
@@ -196,38 +215,40 @@ async def get_stories_of_timeline(timeline_id: int, db: Session= Depends(get_db)
 @router.patch('/story/update/{story_id}')
 async def update_story(
     story_id: int, 
-    data: StoryCreateModel, 
+    data: StoryUpdateModel, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
     # Fetch the existing story
-    story_obj = db.query(Story).filter(Story.id == story_id).first()
+    story_query = db.query(Story).filter(Story.id == story_id)
+    story_obj = story_query.first()
+
     if not story_obj:
-        raise HTTPException(detail="Story not found", status_code=status.HTTP_404_NOT_FOUND)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Story not found"
+        )
 
     # if not current_user.is_admin:
-    #     raise HTTPException(detail="Only for admin", status_code=status.HTTP_401_UNAUTHORIZED)
+    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Only for admin")
 
-    # Update Story Fields (excluding timestamps for now)
-    update_data = data.dict(exclude_unset=True, exclude={"timestamps"})  # Exclude timestamps from direct update
-    for field, value in update_data.items():
-        setattr(story_obj, field, value)
+    update_data = data.dict(exclude_unset=True, exclude={"timestamps"})
 
-    # Handle timestamps separately if they are provided
+    if update_data:
+        story_query.update(update_data, synchronize_session=False)
+
+    # Handle timestamps separately if provided
     if data.timestamps is not None:
-        # Delete existing timestamps for this story
-        db.query(Timestamp).filter(Timestamp.story_id == story_obj.id).delete()
+        db.query(Timestamp).filter(Timestamp.story_id == story_id).delete()
 
-        # Insert new timestamps
         new_timestamps = [
-            Timestamp(story_id=story_obj.id, time_sec=ts.time_sec, label=ts.label)
+            Timestamp(story_id=story_id, time_sec=ts.time_sec, label=ts.label)
             for ts in data.timestamps
         ]
-        db.add_all(new_timestamps)
+        db.bulk_save_objects(new_timestamps)  # ✅ More efficient batch insert
 
     try:
         db.commit()
-        db.refresh(story_obj)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
