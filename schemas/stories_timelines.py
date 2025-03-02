@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime,date
-
+    
 from typing import Optional
 
 class OnThisDayCreateModel(BaseModel):
@@ -50,3 +50,16 @@ class StoryUpdateModel(BaseModel):
     video_url: str = None
     timeline_id: int= None 
     timestamps: list[TimeStampCreateModel] = []
+
+
+class OptionCreateModel(BaseModel):
+    text: str
+    is_correct: bool
+
+class QuestionCreateModel(BaseModel):
+    text: str
+    options: list[OptionCreateModel]  # Must have 4 options
+
+class QuizCreateModel(BaseModel):
+    story_id: int
+    questions: list[QuestionCreateModel]  # Multiple questions per quiz

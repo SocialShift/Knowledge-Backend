@@ -7,7 +7,8 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_b6b1_user:QujB9R7wFAs5JI58ZygRb3eK2Q0I8isH@dpg-cuth9edumphs73ciedm0-a.oregon-postgres.render.com/knowledge_b6b1"
+#DATABASE_URL = "postgresql://knowledge_b6b1_user:QujB9R7wFAs5JI58ZygRb3eK2Q0I8isH@dpg-cuth9edumphs73ciedm0-a.oregon-postgres.render.com/knowledge_b6b1"
+DATABASE_URL = "postgresql://knowledge_pdcl_user:z5fCeEZQNNUnAgohlz9rfIHz7Z7IZQ41@dpg-cv1v6n2j1k6c7397o0pg-a.oregon-postgres.render.com/knowledge_pdcl"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -200,3 +201,37 @@ class Story(Base):
     timeline = relationship("Timeline", back_populates="stories")
     on_this_day = relationship("OnThisDay", back_populates="story", uselist=False)
     timestamps = relationship("Timestamp", back_populates="story", cascade="all, delete-orphan")
+
+
+class Quiz(Base):
+    __tablename__ = "quizzes"
+
+    id = Column(Integer, primary_key=True)
+    story_id = Column(Integer, ForeignKey("stories.id", ondelete="CASCADE"), unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    story = relationship("Story", back_populates="quiz")
+    questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
+
+
+class Question(Base):
+    __tablename__ = "questions"
+
+    id = Column(Integer, primary_key=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"))
+    text = Column(Text, nullable=False)  # The question itself
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    quiz = relationship("Quiz", back_populates="questions")
+    options = relationship("Option", back_populates="question", cascade="all, delete-orphan")
+
+
+class Option(Base):
+    __tablename__ = "options"
+
+    id = Column(Integer, primary_key=True)
+    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"))
+    text = Column(String(255), nullable=False)  # Answer text
+    is_correct = Column(Boolean, default=False)  # Only one option should be correct
+
+    question = relationship("Question", back_populates="options")
