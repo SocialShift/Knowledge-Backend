@@ -1,4 +1,4 @@
-from pydantic import BaseModel,Field,EmailStr
+from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
 
 class LoginModel(BaseModel):
@@ -8,13 +8,12 @@ class LoginModel(BaseModel):
 class UserCreateModel(BaseModel):
     email: EmailStr 
     password: str
-    confirm_password: str= Field(exclude=True)
-
+    confirm_password: str = Field(exclude=True)
 
 class UserModel(BaseModel):
     email: EmailStr  # Ensuring valid email format
 
-class UserResponse(BaseModel):
+class UserResponse(BaseModel):  
     id: int
     email: EmailStr
     joined_at: datetime
@@ -24,19 +23,17 @@ class UserResponse(BaseModel):
         from_attributes = True 
 
 class ProfileUpdate(BaseModel):
-    user: UserModel= None
-    nickname: str= None
-    avatar_url:str= None
-    language_preference: str= None
-    pronouns: str= None
-    location: str= None
-    personalization_questions: dict= None
-
-#class UserModel
+    nickname: str = None
+    language_preference: str = None
+    pronouns: str = None
+    location: str = None
+    personalization_questions: dict = None
     
+    class Config:
+        arbitrary_types_allowed = True
+
 class UserEmailUpdate(BaseModel):
     email: EmailStr
-
 
 class UserPasswordChange(BaseModel):
     current_password: str 

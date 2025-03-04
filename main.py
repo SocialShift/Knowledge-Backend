@@ -2,11 +2,14 @@ from fastapi import FastAPI
 from routers import users, stories_timelines
 from db.models import engine, Base
 from utils.auth import SECRET_KEY
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 app= FastAPI()
 
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
@@ -23,7 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# Mount the media directory to serve static files
+media_path = Path("media")
+media_path.mkdir(exist_ok=True)
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 Base.metadata.create_all(bind=engine)
 
