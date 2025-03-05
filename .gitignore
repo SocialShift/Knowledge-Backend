@@ -5,3 +5,4 @@ utils/__pycache__
 schemas/__pycache__
 routers/__pycache__
 db/__pycache__
+media/

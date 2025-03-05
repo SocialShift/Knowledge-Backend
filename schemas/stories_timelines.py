@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 from fastapi import UploadFile, File
 from pydantic import field_validator
 
@@ -68,10 +68,62 @@ class OptionCreateModel(BaseModel):
     text: str
     is_correct: bool
 
+class OptionResponseModel(BaseModel):
+    id: int
+    text: str
+    is_correct: bool
+    
+    class Config:
+        from_attributes = True
+
 class QuestionCreateModel(BaseModel):
     text: str
     options: list[OptionCreateModel]  # Must have 4 options
+    
+    @field_validator('options')
+    def validate_options(cls, v):
+        if len(v) != 4:
+            raise ValueError('Each question must have exactly 4 options')
+        
+        # Check that exactly one option is correct
+        correct_options = sum(1 for option in v if option.is_correct)
+        if correct_options != 1:
+            raise ValueError('Each question must have exactly one correct option')
+        
+        return v
+
+class QuestionResponseModel(BaseModel):
+    id: int
+    text: str
+    options: list[OptionResponseModel]
+    
+    class Config:
+        from_attributes = True
 
 class QuizCreateModel(BaseModel):
     story_id: int
     questions: list[QuestionCreateModel]  # Multiple questions per quiz
+    
+    @field_validator('questions')
+    def validate_questions(cls, v):
+        if len(v) < 1:
+            raise ValueError('Quiz must have at least one question')
+        return v
+
+class QuizUpdateModel(BaseModel):
+    questions: list[QuestionCreateModel] = None
+    
+    @field_validator('questions')
+    def validate_questions(cls, v):
+        if v is not None and len(v) < 1:
+            raise ValueError('Quiz must have at least one question')
+        return v
+
+class QuizResponseModel(BaseModel):
+    id: int
+    story_id: int
+    created_at: datetime
+    questions: list[QuestionResponseModel]
+    
+    class Config:
+        from_attributes = True

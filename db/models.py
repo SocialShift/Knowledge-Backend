@@ -201,8 +201,9 @@ class Story(Base):
     timeline = relationship("Timeline", back_populates="stories")
     on_this_day = relationship("OnThisDay", back_populates="story", uselist=False)
     timestamps = relationship("Timestamp", back_populates="story", cascade="all, delete-orphan")
+    quiz = relationship("Quiz", back_populates="story", uselist=False, cascade="all, delete-orphan")
 
-"""
+
 
 class Quiz(Base):
     __tablename__ = "quizzes"
@@ -236,4 +237,3 @@ class Option(Base):
     is_correct = Column(Boolean, default=False)  # Only one option should be correct
 
     question = relationship("Question", back_populates="options")
-"""

@@ -1,8 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Form
-from schemas.stories_timelines import TimelineCreateModel, StoryCreateModel, OnThisDayCreateModel, OnThisDayResponseModel, TimelineUpdateModel, StoryUpdateModel, TimeStampCreateModel
+from schemas.stories_timelines import (
+    TimelineCreateModel, StoryCreateModel, OnThisDayCreateModel, OnThisDayResponseModel, 
+    TimelineUpdateModel, StoryUpdateModel, TimeStampCreateModel, QuizCreateModel, 
+    QuizResponseModel, QuestionCreateModel, OptionCreateModel, QuizUpdateModel
+)
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay, Timestamp
+from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
 from fastapi.responses import JSONResponse
@@ -495,3 +499,152 @@ async def delete_story(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post('/story/{story_id}/quiz/create', response_model=QuizResponseModel)
+async def create_quiz(
+    story_id: int,
+    quiz_data: QuizCreateModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if the story exists
+    story = db.query(Story).filter(Story.id == story_id).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    
+    # Check if the story already has a quiz
+    existing_quiz = db.query(Quiz).filter(Quiz.story_id == story_id).first()
+    if existing_quiz:
+        raise HTTPException(status_code=400, detail="This story already has a quiz")
+    
+    try:
+        # Create the quiz
+        quiz = Quiz(story_id=story_id)
+        db.add(quiz)
+        db.flush()  # Flush to get the quiz ID
+        
+        # Create questions and options
+        for question_data in quiz_data.questions:
+            question = Question(
+                quiz_id=quiz.id,
+                text=question_data.text
+            )
+            db.add(question)
+            db.flush()  # Flush to get the question ID
+            
+            # Create options for the question
+            for option_data in question_data.options:
+                option = Option(
+                    question_id=question.id,
+                    text=option_data.text,
+                    is_correct=option_data.is_correct
+                )
+                db.add(option)
+        
+        db.commit()
+        db.refresh(quiz)
+        
+        return quiz
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get('/story/{story_id}/quiz', response_model=QuizResponseModel)
+async def get_quiz_by_story(
+    story_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if the story exists
+    story = db.query(Story).filter(Story.id == story_id).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    
+    # Get the quiz
+    quiz = db.query(Quiz).filter(Quiz.story_id == story_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found for this story")
+    
+    return quiz
+
+@router.get('/quiz/{quiz_id}', response_model=QuizResponseModel)
+async def get_quiz(
+    quiz_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    return quiz
+
+@router.get('/list/quizzes', response_model=List[QuizResponseModel])
+async def get_all_quizzes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    quizzes = db.query(Quiz).all()
+    return quizzes
+
+@router.patch('/quiz/{quiz_id}', response_model=QuizResponseModel)
+async def update_quiz(
+    quiz_id: int,
+    quiz_data: QuizUpdateModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if the quiz exists
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    # Only update questions if provided
+    if quiz_data.questions is not None:
+        try:
+            # Delete existing questions and options
+            db.query(Question).filter(Question.quiz_id == quiz_id).delete()
+            db.flush()
+            
+            # Create new questions and options
+            for question_data in quiz_data.questions:
+                question = Question(
+                    quiz_id=quiz.id,
+                    text=question_data.text
+                )
+                db.add(question)
+                db.flush()  # Flush to get the question ID
+                
+                # Create options for the question
+                for option_data in question_data.options:
+                    option = Option(
+                        question_id=question.id,
+                        text=option_data.text,
+                        is_correct=option_data.is_correct
+                    )
+                    db.add(option)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    db.commit()
+    db.refresh(quiz)
+    
+    return quiz
+
+@router.delete('/quiz/{quiz_id}')
+async def delete_quiz(
+    quiz_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    # Check if the quiz exists
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    # Delete the quiz (cascade will delete questions and options)
+    db.delete(quiz)
+    db.commit()
+    
+    return {"message": "Quiz deleted successfully"}
