@@ -338,11 +338,14 @@ async def create_story(
 
 @router.get('/story/{story_id}')
 async def get_story(story_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    story= db.query(Story).filter(Story.id == story_id).first()
+    story = db.query(Story).filter(Story.id == story_id).first()
 
     if not story:
         raise HTTPException(detail="Story not found", status_code=status.HTTP_404_NOT_FOUND)
-    return story,story.timestamps
+    # Increment the view count
+    story.views += 1
+    db.commit()  # Commit the change to the database
+    return story, story.timestamps
 
 @router.get('/list/stories')
 async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
