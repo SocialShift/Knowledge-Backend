@@ -12,45 +12,31 @@ import json
 router = APIRouter(prefix="/api/auth")
 
 @router.post('/create-user')
-async def create_user(
-    request: Request, 
-    email: str = Form(...),
-    password: str = Form(...),
-    confirm_password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    # Validate with Pydantic
-    try:
-        validated_data = UserCreateModel(
-            email=email,
-            password=password,
-            confirm_password=confirm_password
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
-
-    if validated_data.password != validated_data.confirm_password:
+async def create_user(request: Request, data: UserCreateModel, db: Session = Depends(get_db)):
+    if data.password != data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Passwords do not match"
         )
-    elif db.query(User).filter(User.email == validated_data.email).first():
+
+
+    elif db.query(User).filter(User.email == data.email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already exists"
         )
-    elif len(validated_data.password) < 8:
+    
+    elif len(data.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password must be at least 8 characters long"
         )
-    
     # Your success logic here
-    new_user = User(
-        email=validated_data.email
+    new_user= User(
+        email= data.email
     )
-    new_user.set_password(validated_data.password)
-    
+    new_user.set_password(data.password)
+    print(new_user)
     db.add(new_user)
     try:
         db.commit()
@@ -58,8 +44,7 @@ async def create_user(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    
-    new_profile = Profile(user_id=new_user.id)
+    new_profile= Profile(user_id= new_user.id)
     db.add(new_profile)
     try:
         db.commit()
@@ -89,24 +74,10 @@ async def delete_user(current_user: User = Depends(get_current_user), db: Sessio
     return JSONResponse({'detail': "User deleted"}, status_code=status.HTTP_204_NO_CONTENT)
 
 @router.post("/login")
-async def login(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    # Validate with Pydantic
-    try:
-        validated_data = LoginModel(
-            email=email,
-            password=password
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+async def login(request: Request, data: LoginModel, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
     
-    user = db.query(User).filter(User.email == validated_data.email).first()
-    
-    if not user or not user.verify_password(validated_data.password):
+    if not user or not user.verify_password(data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
@@ -118,6 +89,7 @@ async def login(
     return {
         "user": {
             "id": user.id,
+            "email": user.email,
             "email": user.email
         },
         "message": "Login successful"
@@ -207,26 +179,20 @@ async def profile(current_user: User = Depends(get_current_user), db: Session = 
 
 @router.patch("/profile/update/user-email")
 async def update_user_profile(
-    email: str = Form(...),
+    data: UserEmailUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Validate with Pydantic
-    try:
-        validated_data = UserEmailUpdate(email=email)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
-    
     my_user = db.query(User).filter(User.id == current_user.id).first()
 
     if not my_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if db.query(User).filter(User.email == validated_data.email).first():
+    if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
 
     # Update the email
-    my_user.email = validated_data.email
+    my_user.email = data.email
 
     db.commit()
     db.refresh(my_user)
@@ -235,22 +201,10 @@ async def update_user_profile(
 
 @router.post('/change-password')
 async def change_password(
-    current_password: str = Form(...),
-    new_password: str = Form(...),
-    confirm_new_password: str = Form(...),
+    data: UserPasswordChange, 
     current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    # Validate with Pydantic
-    try:
-        validated_data = UserPasswordChange(
-            current_password=current_password,
-            new_password=new_password,
-            confirm_new_password=confirm_new_password
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
-    
     # Fetch the user instance
     my_user = db.query(User).filter(User.id == current_user.id).first()
 
@@ -261,21 +215,21 @@ async def change_password(
         )
     
     # Verify current password
-    if not pwd_context.verify(validated_data.current_password, my_user.password):
+    if not pwd_context.verify(data.current_password, my_user.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect password"
         )
 
     # Check if new passwords match
-    if validated_data.new_password != validated_data.confirm_new_password:
+    if data.new_password != data.confirm_new_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password and Confirm Password didn't match"
         )
 
     # Hash new password and update user
-    my_user.password = pwd_context.hash(validated_data.new_password)
+    my_user.password = pwd_context.hash(data.new_password)
     
     db.commit()
     db.refresh(my_user)
