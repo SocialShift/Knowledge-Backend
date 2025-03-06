@@ -6,9 +6,8 @@ import random
 import enum
 
 # Database setup
-DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-#DATABASE_URL = "postgresql://knowledge_b6b1_user:QujB9R7wFAs5JI58ZygRb3eK2Q0I8isH@dpg-cuth9edumphs73ciedm0-a.oregon-postgres.render.com/knowledge_b6b1"
-#DATABASE_URL = "postgresql://knowledge_pdcl_user:z5fCeEZQNNUnAgohlz9rfIHz7Z7IZQ41@dpg-cv1v6n2j1k6c7397o0pg-a.oregon-postgres.render.com/knowledge_pdcl"
+#DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
+DATABASE_URL = "postgresql://knowledge_kvs4_user:DJhQfdNn1ZFjQ88WoQCWkWWkwQH9dnKq@dpg-cv4ojtd2ng1s73bq4lr0-a.oregon-postgres.render.com/knowledge_kvs4"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
