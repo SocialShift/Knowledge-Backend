@@ -7,7 +7,7 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_gqk2_user:rgEVZ0TjcsR8dtTxX0F9fVIhoa60SbaT@dpg-cv6mr5bqf0us73f4cf30-a.oregon-postgres.render.com/knowledge_gqk2"
+DATABASE_URL = "postgresql://knowledge_wl4u_user:sEvAjRcp6fKMC9Gi1UM46LyUUQH6rTQq@dpg-cv6tf1jtq21c73dm8bdg-a.oregon-postgres.render.com/knowledge_wl4u"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
