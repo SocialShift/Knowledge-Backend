@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, JSON, ForeignKey, create_engine,Text,Date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, JSON, ForeignKey, create_engine,Text,Date, UniqueConstraint
 from sqlalchemy.orm import relationship, declarative_base, sessionmaker
 from datetime import datetime
 from passlib.context import CryptContext
@@ -7,7 +7,7 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_kvs4_user:DJhQfdNn1ZFjQ88WoQCWkWWkwQH9dnKq@dpg-cv4ojtd2ng1s73bq4lr0-a.oregon-postgres.render.com/knowledge_kvs4"
+DATABASE_URL = "postgresql://knowledge_gqk2_user:rgEVZ0TjcsR8dtTxX0F9fVIhoa60SbaT@dpg-cv6mr5bqf0us73f4cf30-a.oregon-postgres.render.com/knowledge_gqk2"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -117,12 +117,16 @@ class Profile(Base):
 
     id= Column(Integer, primary_key=True)
     user_id= Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), unique=True, nullable=False)
+    points= Column(Integer, default=100)
     
     nickname= Column(String(255), nullable=True)
-    avatar_url= Column(String(255), nullable=True)
+    avatar_url= Column(String(255), default="media/images/default.jpeg")
     referral_code = Column(String(6), nullable=True)
     total_referrals= Column(Integer, default=0, nullable=True)
 
+    current_login_streak = Column(Integer, default=0)
+    max_login_streak = Column(Integer, default=0)
+    last_login_date = Column(Date, nullable=True)
     # ✅ Fixed Enums
     language_preference= Column(Enum(LanguagePreference, native_enum=False), nullable=True, default=LanguagePreference.ENGLISH)
     pronouns= Column(Enum(Pronouns, native_enum=False), nullable=True)
@@ -236,3 +240,18 @@ class Option(Base):
     is_correct = Column(Boolean, default=False)  # Only one option should be correct
 
     question = relationship("Question", back_populates="options")
+
+class QuizAttempt(Base):
+    __tablename__ = "quiz_attempts"
+
+    id= Column(Integer, primary_key=True)
+    user_id= Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    quiz_id= Column(Integer, ForeignKey("quizzes.id", ondelete="CASCADE"))
+    completed= Column(Boolean, default=False)  # Whether the quiz was completed
+    score= Column(Integer, default=0)  # Points earned from this attempt
+    created_at= Column(DateTime, default=datetime.utcnow)
+    completed_at= Column(DateTime, nullable=True)  # When the quiz was completed
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'quiz_id', name='unique_user_quiz'),
+    )

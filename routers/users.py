@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status, UploadFile, File, Form
-from db.models import get_db, User, Profile
+from db.models import get_db, User, Profile, QuizAttempt
 from sqlalchemy.orm import Session
 from schemas.users import UserCreateModel, LoginModel, ProfileUpdate, UserEmailUpdate, UserPasswordChange
 from fastapi.responses import JSONResponse
 from db.models import pwd_context
 from utils.auth import get_current_user, create_session, end_session
 from utils.file_handler import save_image, delete_file
-from typing import Optional
 import json
+from datetime import datetime, date, timedelta
 
 router = APIRouter(prefix="/api/auth")
 
@@ -86,11 +86,15 @@ async def login(request: Request, data: LoginModel, db: Session = Depends(get_db
     # Create session
     create_session(request, user)
     
+    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
     return {
         "user": {
             "id": user.id,
-            "email": user.email,
             "email": user.email
+        },
+        "streak": {
+            "current": profile.current_login_streak if profile else 1,
+            "max": profile.max_login_streak if profile else 1
         },
         "message": "Login successful"
     }
@@ -169,13 +173,6 @@ async def update_profile(
             delete_file(update_data["avatar_url"])
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/user/me")
-async def profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    my_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
-    if not my_profile:
-        return HTTPException(detail="User Not Found", status_code=status.HTTP_404_NOT_FOUND)
-    
-    return my_profile
 
 @router.patch("/profile/update/user-email")
 async def update_user_profile(
@@ -235,3 +232,179 @@ async def change_password(
     db.refresh(my_user)
 
     return {"message": "Password changed successfully."}
+
+@router.get("/user/me")
+async def get_profile(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the current user's profile with detailed information"""
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Calculate user rank
+    higher_ranked_count = db.query(Profile).filter(Profile.points > profile.points).count()
+    user_rank = higher_ranked_count + 1
+    
+    # Get total number of users for percentile calculation
+    total_users = db.query(Profile).count()
+    percentile = round((1 - (user_rank / total_users)) * 100) if total_users > 0 else 0
+    
+    # Get completed quizzes count
+    completed_quizzes = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == current_user.id,
+        QuizAttempt.completed == True
+    ).count()
+    
+    # Calculate days until next streak milestone
+    next_milestone = 7 if profile.current_login_streak < 7 else 30
+    days_to_milestone = next_milestone - (profile.current_login_streak % next_milestone)
+    
+    # Get streak bonus information from the session
+    streak_bonus = request.session.get("streak_bonus", 0)
+    
+    # Clear the streak bonus from the session after reading it
+    if streak_bonus:
+        request.session.pop("streak_bonus", None)
+    
+    return {
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "is_admin": current_user.is_admin,
+            "joined_at": current_user.joined_at
+        },
+        "profile": {
+            "id": profile.id,
+            "nickname": profile.nickname,
+            "avatar_url": profile.avatar_url,
+            "points": profile.points,
+            "referral_code": profile.referral_code,
+            "total_referrals": profile.total_referrals,
+            "language_preference": profile.language_preference,
+            "pronouns": profile.pronouns,
+            "location": profile.location,
+            "personalization_questions": profile.personalization_questions
+        },
+        "stats": {
+            "rank": user_rank,
+            "total_users": total_users,
+            "percentile": percentile,
+            "completed_quizzes": completed_quizzes,
+            "current_login_streak": profile.current_login_streak,
+            "max_login_streak": profile.max_login_streak,
+            "days_to_next_milestone": days_to_milestone,
+            "next_milestone": next_milestone,
+            "streak_bonus": streak_bonus
+        }
+    }
+
+@router.get("/user/streak")
+async def get_user_streak(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the current user's login streak information"""
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Calculate days until next streak milestone
+    next_milestone = 7 if profile.current_login_streak < 7 else 30
+    days_to_milestone = next_milestone - (profile.current_login_streak % next_milestone)
+    
+    # Get streak bonus information from the session
+    streak_bonus = request.session.get("streak_bonus", 0)
+    current_streak = profile.current_login_streak
+    
+    # Calculate streak status
+    streak_status = "active" if profile.last_login_date == date.today() else "inactive"
+    
+    # Calculate days since last login
+    days_since_last_login = 0
+    if profile.last_login_date:
+        days_since_last_login = (date.today() - profile.last_login_date).days
+    
+    # Clear the streak bonus from the session after reading it
+    if streak_bonus:
+        request.session.pop("streak_bonus", None)
+    
+    return {
+        "current_streak": current_streak,
+        "max_streak": profile.max_login_streak,
+        "streak_status": streak_status,
+        "days_since_last_login": days_since_last_login,
+        "days_to_next_milestone": days_to_milestone,
+        "next_milestone": next_milestone,
+        "streak_bonus": streak_bonus,
+        "last_login_date": profile.last_login_date.isoformat() if profile.last_login_date else None
+    }
+
+@router.get("/notifications")
+async def get_notifications(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get notifications for the current user, including streak updates"""
+    notifications = []
+    
+    # Check for streak bonus notification
+    streak_bonus = request.session.get("streak_bonus", 0)
+    current_streak = request.session.get("current_streak", 0)
+    
+    if streak_bonus > 0:
+        # Create a notification for the streak bonus
+        if current_streak == 7:
+            notifications.append({
+                "type": "streak_milestone",
+                "title": "7-Day Streak Achieved!",
+                "message": f"You've logged in for 7 days in a row! You earned a bonus of {streak_bonus} points.",
+                "points": streak_bonus
+            })
+        elif current_streak == 30:
+            notifications.append({
+                "type": "streak_milestone",
+                "title": "30-Day Streak Achieved!",
+                "message": f"Amazing! You've logged in for 30 days in a row! You earned a bonus of {streak_bonus} points.",
+                "points": streak_bonus
+            })
+        else:
+            notifications.append({
+                "type": "daily_login",
+                "title": "Daily Login Bonus",
+                "message": f"Thanks for coming back! You earned {streak_bonus} points for logging in today.",
+                "points": streak_bonus
+            })
+        
+        # Clear the notifications from the session after reading them
+        request.session.pop("streak_bonus", None)
+        request.session.pop("current_streak", None)
+    
+    # Get profile for streak information
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    
+    # Check if the user is close to a streak milestone
+    if profile and profile.current_login_streak > 0:
+        if profile.current_login_streak == 6:
+            notifications.append({
+                "type": "streak_reminder",
+                "title": "Almost There!",
+                "message": "You're one day away from a 7-day streak and a 50-point bonus!",
+                "streak": profile.current_login_streak
+            })
+        elif profile.current_login_streak == 29:
+            notifications.append({
+                "type": "streak_reminder",
+                "title": "So Close!",
+                "message": "You're one day away from a 30-day streak and a 200-point bonus!",
+                "streak": profile.current_login_streak
+            })
+    
+    return {
+        "notifications": notifications,
+        "unread_count": len(notifications)
+    }

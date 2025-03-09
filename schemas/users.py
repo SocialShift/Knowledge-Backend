@@ -1,9 +1,13 @@
 from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
+from typing import List
 
 class LoginModel(BaseModel):
     email: EmailStr 
     password: str
+
+
+
 
 class UserCreateModel(BaseModel):
     email: EmailStr 
@@ -32,6 +36,9 @@ class ProfileUpdate(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+
+
+
 class UserEmailUpdate(BaseModel):
     email: EmailStr
 
@@ -43,3 +50,18 @@ class UserPasswordChange(BaseModel):
 class UserPasswordForgot(BaseModel):
     new_password: str 
     confirm_new_password: str
+
+
+
+class LeaderboardEntryModel(BaseModel):
+    rank: int
+    user_id: int
+    nickname: str
+    avatar_url: str = None
+    points: int
+    current_streak: int
+    max_streak: int
+
+class LeaderboardResponseModel(BaseModel):
+    leaderboard: List[LeaderboardEntryModel]
+    user_rank: int = None

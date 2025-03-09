@@ -2,15 +2,17 @@ from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File,
 from schemas.stories_timelines import (
     TimelineCreateModel, StoryCreateModel, OnThisDayCreateModel, OnThisDayResponseModel, 
     TimelineUpdateModel, StoryUpdateModel, TimeStampCreateModel, QuizCreateModel, 
-    QuizResponseModel, QuestionCreateModel, OptionCreateModel, QuizUpdateModel
+    QuizResponseModel, QuestionCreateModel, OptionCreateModel, QuizUpdateModel, QuizSubmissionModel,
+    QuizAttemptResponseModel
 )
+from schemas.users import LeaderboardEntryModel, LeaderboardResponseModel
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option
+from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
 from fastapi.responses import JSONResponse
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 import json
 
@@ -66,14 +68,91 @@ async def create_otd(
 def get_all_otd(db: Session = Depends(get_db)):
     return db.query(OnThisDay).all()
 
-@router.get("/{date}", response_model=OnThisDayResponseModel)
+@router.get('/leaderboard', response_model=LeaderboardResponseModel)
+async def get_leaderboard(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the top users by points"""
+    # Query profiles ordered by points (descending)
+    top_profiles = db.query(
+        Profile.id,
+        Profile.user_id,
+        Profile.nickname,
+        Profile.avatar_url,
+        Profile.points,
+        Profile.current_login_streak,
+        Profile.max_login_streak,
+        User.email
+    ).join(User).order_by(Profile.points.desc()).limit(limit).all()
+    
+    # Format the results
+    leaderboard = []
+    for i, profile in enumerate(top_profiles):
+        # Create a dictionary with the profile data
+        profile_dict = LeaderboardEntryModel(
+            rank=i + 1,
+            user_id=profile.user_id,
+            nickname=profile.nickname or profile.email.split('@')[0],  # Use email username if no nickname
+            avatar_url=profile.avatar_url,
+            points=profile.points,
+            current_streak=profile.current_login_streak,
+            max_streak=profile.max_login_streak
+        )
+        leaderboard.append(profile_dict)
+    
+    # Get the current user's rank
+    user_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    user_rank = None
+    
+    if user_profile:
+        higher_ranked_count = db.query(Profile).filter(Profile.points > user_profile.points).count()
+        user_rank = higher_ranked_count + 1
+    
+    return LeaderboardResponseModel(
+        leaderboard=leaderboard,
+        user_rank=user_rank
+    )
+
+@router.get('/user/rank')
+async def get_user_rank(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the current user's rank based on points"""
+    # Get the current user's profile
+    user_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not user_profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    
+    # Count how many users have more points than the current user
+    higher_ranked_count = db.query(Profile).filter(Profile.points > user_profile.points).count()
+    
+    # The user's rank is the count of users with more points + 1
+    user_rank = higher_ranked_count + 1
+    
+    # Get total number of users for percentile calculation
+    total_users = db.query(Profile).count()
+    percentile = round((1 - (user_rank / total_users)) * 100) if total_users > 0 else 0
+    
+    return {
+        "rank": user_rank,
+        "total_users": total_users,
+        "percentile": percentile,
+        "points": user_profile.points,
+        "current_streak": user_profile.current_login_streak,
+        "max_streak": user_profile.max_login_streak
+    }
+
+@router.get("/otd/date/{date}", response_model=OnThisDayResponseModel)
 def get_otd_by_date(date: date, db: Session = Depends(get_db)):
     otd_entry = db.query(OnThisDay).filter(OnThisDay.date == date).first()
     if not otd_entry:
         raise HTTPException(status_code=404, detail="No historical event found for this date")
     return otd_entry
 
-@router.delete("/{id}")
+@router.delete("/otd/{id}")
 def delete_otd(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     otd_entry = db.query(OnThisDay).filter(OnThisDay.id == id).first()
     if not otd_entry:
@@ -568,6 +647,22 @@ async def get_quiz_by_story(
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found for this story")
     
+    # Check if the user has already started this quiz
+    quiz_attempt = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == current_user.id,
+        QuizAttempt.quiz_id == quiz.id
+    ).first()
+    
+    # If no attempt exists, create one
+    if not quiz_attempt:
+        quiz_attempt = QuizAttempt(
+            user_id=current_user.id,
+            quiz_id=quiz.id,
+            completed=False
+        )
+        db.add(quiz_attempt)
+        db.commit()
+    
     return quiz
 
 @router.get('/quiz/{quiz_id}', response_model=QuizResponseModel)
@@ -646,8 +741,137 @@ async def delete_quiz(
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     
-    # Delete the quiz (cascade will delete questions and options)
-    db.delete(quiz)
-    db.commit()
+    try:
+        db.delete(quiz)
+        db.commit()
+        return {"detail": "Quiz deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post('/quiz/submit')
+async def submit_quiz(
+    submission: QuizSubmissionModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if the quiz exists
+    quiz = db.query(Quiz).filter(Quiz.id == submission.quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
     
-    return {"message": "Quiz deleted successfully"}
+    # Get the user's profile to update points
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    
+    # Check if the user has already completed this quiz
+    quiz_attempt = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == current_user.id,
+        QuizAttempt.quiz_id == quiz.id
+    ).first()
+    
+    # If the quiz has already been completed, don't award points again
+    if quiz_attempt and quiz_attempt.completed:
+        return {
+            "message": "Quiz already completed",
+            "total_questions": len(quiz.questions),
+            "correct_answers": 0,
+            "points_earned": 0,
+            "completion_bonus": 0,
+            "new_total_points": profile.points
+        }
+    
+    try:
+        # Track points and correct answers
+        correct_answers = 0
+        total_questions = len(quiz.questions)
+        
+        # Process each answer
+        for answer in submission.answers:
+            # Get the question
+            question = db.query(Question).filter(Question.id == answer.question_id).first()
+            if not question or question.quiz_id != quiz.id:
+                raise HTTPException(status_code=400, detail=f"Invalid question ID: {answer.question_id}")
+            
+            # Check if the selected option is correct
+            selected_option = db.query(Option).filter(
+                Option.id == answer.selected_option_id,
+                Option.question_id == answer.question_id
+            ).first()
+            
+            if not selected_option:
+                raise HTTPException(status_code=400, detail=f"Invalid option ID: {answer.selected_option_id}")
+            
+            # Award points for correct answers
+            if selected_option.is_correct:
+                correct_answers += 1
+        
+        # Calculate points
+        correct_answer_points = correct_answers * 10  # 10 points per correct answer
+        completion_bonus = 25 if len(submission.answers) == total_questions else 0  # 25 points for completing the quiz
+        total_points_earned = correct_answer_points + completion_bonus
+        
+        # Update user's profile points
+        profile.points += total_points_earned
+        
+        # Update or create quiz attempt record
+        if not quiz_attempt:
+            quiz_attempt = QuizAttempt(
+                user_id=current_user.id,
+                quiz_id=quiz.id,
+                completed=True,
+                score=total_points_earned,
+                completed_at=datetime.utcnow()
+            )
+            db.add(quiz_attempt)
+        else:
+            quiz_attempt.completed = True
+            quiz_attempt.score = total_points_earned
+            quiz_attempt.completed_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return {
+            "total_questions": total_questions,
+            "correct_answers": correct_answers,
+            "points_earned": total_points_earned,
+            "completion_bonus": completion_bonus,
+            "new_total_points": profile.points
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get('/user/quiz-history', response_model=list[QuizAttemptResponseModel])
+async def get_user_quiz_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the quiz history for the current user"""
+    quiz_attempts = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == current_user.id
+    ).all()
+    
+    return quiz_attempts
+
+@router.get('/user/points')
+async def get_user_points(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the current user's points"""
+    profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    
+    # Get completed quizzes count
+    completed_quizzes = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == current_user.id,
+        QuizAttempt.completed == True
+    ).count()
+    
+    return {
+        "points": profile.points,
+        "completed_quizzes": completed_quizzes
+    }

@@ -127,3 +127,23 @@ class QuizResponseModel(BaseModel):
     
     class Config:
         from_attributes = True
+
+# New schema for quiz submissions
+class QuizAnswerModel(BaseModel):
+    question_id: int
+    selected_option_id: int
+
+class QuizSubmissionModel(BaseModel):
+    quiz_id: int
+    answers: list[QuizAnswerModel]
+
+class QuizAttemptResponseModel(BaseModel):
+    id: int
+    quiz_id: int
+    completed: bool
+    score: int
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
