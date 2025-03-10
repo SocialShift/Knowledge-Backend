@@ -565,36 +565,8 @@ async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depe
 
 @router.get('/timeline/{timeline_id}/stories')
 async def get_stories_of_timeline(timeline_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    stories = db.query(Story).filter(Story.timeline_id == timeline_id).all()
-    
-    # Create a list of stories with their timestamps
-    stories_with_timestamps = []
-    for story in stories:
-        timestamps = db.query(Timestamp).filter(Timestamp.story_id == story.id).all()
-        stories_with_timestamps.append({
-            "story": {
-                "id": story.id,
-                "title": story.title,
-                "desc": story.desc,
-                "thumbnail_url": story.thumbnail_url,
-                "video_url": story.video_url,
-                "timeline_id": story.timeline_id,
-                "story_date": story.story_date,
-                "views": story.views,
-                "likes": story.likes,
-                "created_at": story.created_at
-            },
-            "timestamps": [
-                {
-                    "id": ts.id,
-                    "story_id": ts.story_id,
-                    "time_sec": ts.time_sec,
-                    "label": ts.label
-                } for ts in timestamps
-            ]
-        })
-    
-    return stories_with_timestamps
+    get_stories= db.query(Story).filter(Story.timeline_id == timeline_id).all()
+    return get_stories
 
 @router.patch('/story/update/{story_id}')
 async def update_story(
