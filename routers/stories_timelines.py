@@ -338,6 +338,7 @@ async def create_story(
     timeline: int,
     title: str = Form(...),
     desc: str = Form(...),
+    story_date: date= Form(...),
     timestamps_json: str = Form("[]"),
     thumbnail_file: UploadFile = File(...),
     video_file: UploadFile = File(...),
@@ -354,7 +355,8 @@ async def create_story(
         validated_data = StoryCreateModel(
             title=title,
             desc=desc,
-            timeline_id=timeline
+            timeline_id=timeline,
+            story_date=story_date
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
@@ -362,6 +364,7 @@ async def create_story(
     # Parse timestamps from JSON
     try:
         timestamps_data = json.loads(timestamps_json)
+        print(timestamps_data)
         # Validate each timestamp
         validated_timestamps = []
         for ts in timestamps_data:
@@ -383,7 +386,8 @@ async def create_story(
         desc=validated_data.desc,
         thumbnail_url=thumbnail_url,
         video_url=video_url,
-        timeline_id=current_timeline.id
+        timeline_id=current_timeline.id,
+        story_date= validated_data.story_date
     )
     
     db.add(new_story)
@@ -402,6 +406,7 @@ async def create_story(
         ]
         
         if timestamp_objects:
+            print('lalala')
             db.add_all(timestamp_objects)
             db.commit()
             
@@ -424,6 +429,7 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
     # Increment the view count
     story.views += 1
     db.commit()  # Commit the change to the database
+    print(story.timestamps)
     return story, story.timestamps
 
 @router.get('/list/stories')
@@ -442,6 +448,7 @@ async def update_story(
     title: Optional[str] = Form(None),
     desc: Optional[str] = Form(None),
     timeline_id: Optional[int] = Form(None),
+    story_date: Optional[date] = Form(None),
     timestamps_json: Optional[str] = Form(None),
     thumbnail_file: Optional[UploadFile] = File(None),
     video_file: Optional[UploadFile] = File(None),
@@ -466,6 +473,8 @@ async def update_story(
         update_data["desc"] = desc
     if timeline_id is not None:
         update_data["timeline_id"] = timeline_id
+    if story_date is not None:
+        update_data["story_date"] = story_date
     
     # Validate with Pydantic if there's data to update
     if update_data:

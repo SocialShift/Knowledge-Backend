@@ -6,8 +6,8 @@ import random
 import enum
 
 # Database setup
-#DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_wl4u_user:sEvAjRcp6fKMC9Gi1UM46LyUUQH6rTQq@dpg-cv6tf1jtq21c73dm8bdg-a.oregon-postgres.render.com/knowledge_wl4u"
+DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
+#DATABASE_URL = "postgresql://knowledge_wl4u_user:sEvAjRcp6fKMC9Gi1UM46LyUUQH6rTQq@dpg-cv6tf1jtq21c73dm8bdg-a.oregon-postgres.render.com/knowledge_wl4u"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -193,6 +193,7 @@ class Story(Base):
 
     id = Column(Integer, primary_key=True)
     timeline_id = Column(Integer, ForeignKey("timelines.id", ondelete="CASCADE"), nullable=True)  # Links to Timeline
+    story_date= Column(Date, nullable=False)
     title = Column(String(100), nullable=False)
     desc = Column(Text)
     thumbnail_url = Column(String(255), unique=True)

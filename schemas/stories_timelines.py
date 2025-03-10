@@ -50,6 +50,7 @@ class StoryCreateModel(BaseModel):
     title: str
     desc: str 
     timeline_id: int = None 
+    story_date: date
     timestamps: list[TimeStampCreateModel] = []
 
     class Config:
@@ -59,6 +60,7 @@ class StoryUpdateModel(BaseModel):
     title: str = None
     desc: str = None
     timeline_id: int = None 
+    story_date: date = None
     timestamps: list[TimeStampCreateModel] = None
 
     class Config:
