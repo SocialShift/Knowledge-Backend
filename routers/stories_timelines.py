@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from datetime import date, datetime
 from typing import Optional, List
 import json
+import re
 
 router = APIRouter(
     prefix="/api"
@@ -363,17 +364,62 @@ async def create_story(
     
     # Parse timestamps from JSON
     try:
+        print("Raw timestamps_json:", timestamps_json)
+        print("Type of timestamps_json:", type(timestamps_json))
+        
+        # Special handling for the format in the example
+        if "{:" in timestamps_json and "}:" in timestamps_json:
+            # Extract the actual JSON part using regex
+            match = re.search(r'"timestamps_json":\s*(\[.*?\])', timestamps_json)
+            if match:
+                timestamps_json = match.group(1)
+                print("Extracted timestamps_json:", timestamps_json)
+        
+        # Try to clean the JSON string if it has extra characters
+        if timestamps_json.startswith("{:") and timestamps_json.endswith("}:"):
+            # Extract the actual JSON part
+            timestamps_json = timestamps_json[2:-2].strip()
+            print("Cleaned timestamps_json:", timestamps_json)
+        
         timestamps_data = json.loads(timestamps_json)
-        print(timestamps_data)
+        print("Parsed timestamps data:", timestamps_data)
+        print("Type of parsed data:", type(timestamps_data))
+        
         # Validate each timestamp
         validated_timestamps = []
         for ts in timestamps_data:
+            print("Processing timestamp:", ts)
             validated_timestamp = TimeStampCreateModel(**ts)
             validated_timestamps.append(validated_timestamp.dict())
         timestamps_data = validated_timestamps
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid timestamps JSON format")
+    except json.JSONDecodeError as e:
+        print("JSON decode error:", str(e))
+        
+        # Try one more approach - if the string contains the timestamps directly
+        try:
+            # Example format: '[{"time_sec": 233, "label": "y3rfyireiefry"},{"time_sec":2332, "label": "bhyerfhrefih"}]'
+            if "[{" in timestamps_json and "}]" in timestamps_json:
+                start_idx = timestamps_json.find("[{")
+                end_idx = timestamps_json.find("}]") + 2
+                extracted_json = timestamps_json[start_idx:end_idx]
+                print("Extracted JSON from string:", extracted_json)
+                
+                timestamps_data = json.loads(extracted_json)
+                print("Successfully parsed extracted JSON:", timestamps_data)
+                
+                # Validate each timestamp
+                validated_timestamps = []
+                for ts in timestamps_data:
+                    validated_timestamp = TimeStampCreateModel(**ts)
+                    validated_timestamps.append(validated_timestamp.dict())
+                timestamps_data = validated_timestamps
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid timestamps JSON format: {str(e)}")
+        except Exception as inner_e:
+            print("Failed second attempt to parse JSON:", str(inner_e))
+            raise HTTPException(status_code=400, detail=f"Invalid timestamps JSON format: {str(e)}")
     except Exception as e:
+        print("Other timestamp error:", str(e))
         raise HTTPException(status_code=400, detail=f"Timestamp validation error: {str(e)}")
     
     # Save files
@@ -395,23 +441,48 @@ async def create_story(
         db.commit()
         db.refresh(new_story)
         
-        # Add timestamps
-        timestamp_objects = [
-            Timestamp(
+        # Add timestamps - create them one by one for better debugging
+        for ts in timestamps_data:
+            timestamp = Timestamp(
                 story_id=new_story.id,
-                time_sec=ts.get("time_sec"),
-                label=ts.get("label")
+                time_sec=ts["time_sec"],
+                label=ts["label"]
             )
-            for ts in timestamps_data
-        ]
+            print(f"Creating timestamp: {timestamp.time_sec}, {timestamp.label} for story {timestamp.story_id}")
+            db.add(timestamp)
         
-        if timestamp_objects:
-            print('lalala')
-            db.add_all(timestamp_objects)
-            db.commit()
-            
-        return new_story
+        # Commit the timestamps
+        db.commit()
+        
+        # Verify timestamps were created
+        created_timestamps = db.query(Timestamp).filter(Timestamp.story_id == new_story.id).all()
+        print(f"Created {len(created_timestamps)} timestamps for story {new_story.id}")
+        
+        # Return story with timestamps
+        return {
+            "story": {
+                "id": new_story.id,
+                "title": new_story.title,
+                "desc": new_story.desc,
+                "thumbnail_url": new_story.thumbnail_url,
+                "video_url": new_story.video_url,
+                "timeline_id": new_story.timeline_id,
+                "story_date": new_story.story_date,
+                "views": new_story.views,
+                "likes": new_story.likes,
+                "created_at": new_story.created_at
+            },
+            "timestamps": [
+                {
+                    "id": ts.id,
+                    "story_id": ts.story_id,
+                    "time_sec": ts.time_sec,
+                    "label": ts.label
+                } for ts in created_timestamps
+            ]
+        }
     except Exception as e:
+        print("Error during story/timestamp creation:", str(e))
         db.rollback()
         # Delete uploaded files if there was an error
         if thumbnail_url:
@@ -429,18 +500,101 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
     # Increment the view count
     story.views += 1
     db.commit()  # Commit the change to the database
-    print(story.timestamps)
-    return story, story.timestamps
+    
+    # Get timestamps for this story
+    timestamps = db.query(Timestamp).filter(Timestamp.story_id == story_id).all()
+    
+    # Create a response dictionary with story and timestamps as structured data
+    response = {
+        "story": {
+            "id": story.id,
+            "title": story.title,
+            "desc": story.desc,
+            "thumbnail_url": story.thumbnail_url,
+            "video_url": story.video_url,
+            "timeline_id": story.timeline_id,
+            "story_date": story.story_date,
+            "views": story.views,
+            "likes": story.likes,
+            "created_at": story.created_at
+        },
+        "timestamps": [
+            {
+                "id": ts.id,
+                "story_id": ts.story_id,
+                "time_sec": ts.time_sec,
+                "label": ts.label
+            } for ts in timestamps
+        ]
+    }
+    
+    return response
 
 @router.get('/list/stories')
 async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    all_stories= db.query(Story).all()
-    return all_stories
+    all_stories = db.query(Story).all()
+    
+    # Create a list of stories with their timestamps
+    stories_with_timestamps = []
+    for story in all_stories:
+        timestamps = db.query(Timestamp).filter(Timestamp.story_id == story.id).all()
+        stories_with_timestamps.append({
+            "story": {
+                "id": story.id,
+                "title": story.title,
+                "desc": story.desc,
+                "thumbnail_url": story.thumbnail_url,
+                "video_url": story.video_url,
+                "timeline_id": story.timeline_id,
+                "story_date": story.story_date,
+                "views": story.views,
+                "likes": story.likes,
+                "created_at": story.created_at
+            },
+            "timestamps": [
+                {
+                    "id": ts.id,
+                    "story_id": ts.story_id,
+                    "time_sec": ts.time_sec,
+                    "label": ts.label
+                } for ts in timestamps
+            ]
+        })
+    
+    return stories_with_timestamps
 
 @router.get('/timeline/{timeline_id}/stories')
 async def get_stories_of_timeline(timeline_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    get_stories= db.query(Story).filter(Story.timeline_id == timeline_id).all()
-    return get_stories
+    stories = db.query(Story).filter(Story.timeline_id == timeline_id).all()
+    
+    # Create a list of stories with their timestamps
+    stories_with_timestamps = []
+    for story in stories:
+        timestamps = db.query(Timestamp).filter(Timestamp.story_id == story.id).all()
+        stories_with_timestamps.append({
+            "story": {
+                "id": story.id,
+                "title": story.title,
+                "desc": story.desc,
+                "thumbnail_url": story.thumbnail_url,
+                "video_url": story.video_url,
+                "timeline_id": story.timeline_id,
+                "story_date": story.story_date,
+                "views": story.views,
+                "likes": story.likes,
+                "created_at": story.created_at
+            },
+            "timestamps": [
+                {
+                    "id": ts.id,
+                    "story_id": ts.story_id,
+                    "time_sec": ts.time_sec,
+                    "label": ts.label
+                } for ts in timestamps
+            ]
+        })
+    
+    return stories_with_timestamps
 
 @router.patch('/story/update/{story_id}')
 async def update_story(
@@ -503,36 +657,77 @@ async def update_story(
     # Handle timestamps separately if provided
     if timestamps_json is not None:
         try:
+            print("Raw timestamps_json:", timestamps_json)
+            print("Type of timestamps_json:", type(timestamps_json))
+            
+            # Special handling for the format in the example
+            if "{:" in timestamps_json and "}:" in timestamps_json:
+                # Extract the actual JSON part using regex
+                match = re.search(r'"timestamps_json":\s*(\[.*?\])', timestamps_json)
+                if match:
+                    timestamps_json = match.group(1)
+                    print("Extracted timestamps_json:", timestamps_json)
+            
+            # Try to clean the JSON string if it has extra characters
+            if timestamps_json.startswith("{:") and timestamps_json.endswith("}:"):
+                # Extract the actual JSON part
+                timestamps_json = timestamps_json[2:-2].strip()
+                print("Cleaned timestamps_json:", timestamps_json)
+            
             timestamps_data = json.loads(timestamps_json)
+            print("Parsed timestamps data:", timestamps_data)
+            print("Type of parsed data:", type(timestamps_data))
             
             # Validate timestamps
             validated_timestamps = []
             for ts in timestamps_data:
+                print("Processing timestamp:", ts)
                 validated_timestamp = TimeStampCreateModel(**ts)
-                validated_timestamps.append({
-                    "time_sec": validated_timestamp.time_sec,
-                    "label": validated_timestamp.label
-                })
+                validated_timestamps.append(validated_timestamp.dict())
             
-            # Delete existing timestamps
-            db.query(Timestamp).filter(Timestamp.story_id == story_id).delete()
+        except json.JSONDecodeError as e:
+            print("JSON decode error:", str(e))
             
-            # Create new timestamps
-            new_timestamps = [
-                Timestamp(
-                    story_id=story_id,
-                    time_sec=ts["time_sec"],
-                    label=ts["label"]
-                )
-                for ts in validated_timestamps
-            ]
-            
-            if new_timestamps:
-                db.bulk_save_objects(new_timestamps)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid timestamps JSON format")
+            # Try one more approach - if the string contains the timestamps directly
+            try:
+                # Example format: '[{"time_sec": 233, "label": "y3rfyireiefry"},{"time_sec":2332, "label": "bhyerfhrefih"}]'
+                if "[{" in timestamps_json and "}]" in timestamps_json:
+                    start_idx = timestamps_json.find("[{")
+                    end_idx = timestamps_json.find("}]") + 2
+                    extracted_json = timestamps_json[start_idx:end_idx]
+                    print("Extracted JSON from string:", extracted_json)
+                    
+                    timestamps_data = json.loads(extracted_json)
+                    print("Successfully parsed extracted JSON:", timestamps_data)
+                    
+                    # Validate each timestamp
+                    validated_timestamps = []
+                    for ts in timestamps_data:
+                        validated_timestamp = TimeStampCreateModel(**ts)
+                        validated_timestamps.append(validated_timestamp.dict())
+                else:
+                    raise HTTPException(status_code=400, detail=f"Invalid timestamps JSON format: {str(e)}")
+            except Exception as inner_e:
+                print("Failed second attempt to parse JSON:", str(inner_e))
+                raise HTTPException(status_code=400, detail=f"Invalid timestamps JSON format: {str(e)}")
         except Exception as e:
+            print("Other timestamp error:", str(e))
             raise HTTPException(status_code=400, detail=f"Timestamp validation error: {str(e)}")
+            
+        # Delete existing timestamps
+        db.query(Timestamp).filter(Timestamp.story_id == story_id).delete()
+        
+        # Create new timestamps one by one for better debugging
+        for ts in validated_timestamps:
+            timestamp = Timestamp(
+                story_id=story_id,
+                time_sec=ts["time_sec"],
+                label=ts["label"]
+            )
+            print(f"Creating timestamp: {timestamp.time_sec}, {timestamp.label} for story {timestamp.story_id}")
+            db.add(timestamp)
+        
+        print(f"Created {len(validated_timestamps)} updated timestamps")
     
     try:
         db.commit()
@@ -543,11 +738,35 @@ async def update_story(
         if old_video and video_file:
             delete_file(old_video)
             
-        return JSONResponse(
-            {'detail': 'Story updated successfully'},
-            status_code=status.HTTP_200_OK
-        )
+        # Get the updated story with timestamps
+        updated_story = db.query(Story).filter(Story.id == story_id).first()
+        timestamps = db.query(Timestamp).filter(Timestamp.story_id == story_id).all()
+        
+        return {
+            "detail": "Story updated successfully",
+            "story": {
+                "id": updated_story.id,
+                "title": updated_story.title,
+                "desc": updated_story.desc,
+                "thumbnail_url": updated_story.thumbnail_url,
+                "video_url": updated_story.video_url,
+                "timeline_id": updated_story.timeline_id,
+                "story_date": updated_story.story_date,
+                "views": updated_story.views,
+                "likes": updated_story.likes,
+                "created_at": updated_story.created_at
+            },
+            "timestamps": [
+                {
+                    "id": ts.id,
+                    "story_id": ts.story_id,
+                    "time_sec": ts.time_sec,
+                    "label": ts.label
+                } for ts in timestamps
+            ]
+        }
     except Exception as e:
+        print("Error during story/timestamp update:", str(e))
         db.rollback()
         # Delete new files if there was an error
         if thumbnail_file and "thumbnail_url" in update_data:
