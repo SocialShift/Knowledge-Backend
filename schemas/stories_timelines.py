@@ -3,6 +3,7 @@ from datetime import datetime, date
 from typing import Optional, List
 from fastapi import UploadFile, File
 from pydantic import field_validator
+from db.models import StoryType
 
 class OnThisDayCreateModel(BaseModel):
     date: date
@@ -51,6 +52,7 @@ class StoryCreateModel(BaseModel):
     desc: str 
     timeline_id: int = None 
     story_date: date
+    story_type: Optional[StoryType] = None
     timestamps: list[TimeStampCreateModel] = []
 
     class Config:
@@ -61,6 +63,7 @@ class StoryUpdateModel(BaseModel):
     desc: str = None
     timeline_id: int = None 
     story_date: date = None
+    story_type: Optional[StoryType] = None
     timestamps: list[TimeStampCreateModel] = None
 
     class Config:

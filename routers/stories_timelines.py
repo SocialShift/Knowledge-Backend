@@ -8,7 +8,7 @@ from schemas.stories_timelines import (
 from schemas.users import LeaderboardEntryModel, LeaderboardResponseModel
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt
+from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
 from fastapi.responses import JSONResponse
@@ -340,9 +340,10 @@ async def create_story(
     title: str = Form(...),
     desc: str = Form(...),
     story_date: date= Form(...),
+    story_type: Optional[int] = Form(None),
     timestamps_json: str = Form("[]"),
     thumbnail_file: UploadFile = File(...),
-    video_file: UploadFile = File(...),
+    video_file: Optional[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -357,7 +358,8 @@ async def create_story(
             title=title,
             desc=desc,
             timeline_id=timeline,
-            story_date=story_date
+            story_date=story_date,
+            story_type=story_type
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
@@ -433,7 +435,8 @@ async def create_story(
         thumbnail_url=thumbnail_url,
         video_url=video_url,
         timeline_id=current_timeline.id,
-        story_date= validated_data.story_date
+        story_date=validated_data.story_date,
+        story_type=validated_data.story_type
     )
     
     db.add(new_story)
@@ -468,6 +471,7 @@ async def create_story(
                 "video_url": new_story.video_url,
                 "timeline_id": new_story.timeline_id,
                 "story_date": new_story.story_date,
+                "story_type": new_story.story_type,
                 "views": new_story.views,
                 "likes": new_story.likes,
                 "created_at": new_story.created_at
@@ -514,6 +518,7 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
             "video_url": story.video_url,
             "timeline_id": story.timeline_id,
             "story_date": story.story_date,
+            "story_type": story.story_type,
             "views": story.views,
             "likes": story.likes,
             "created_at": story.created_at
@@ -547,6 +552,7 @@ async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depe
                 "video_url": story.video_url,
                 "timeline_id": story.timeline_id,
                 "story_date": story.story_date,
+                "story_type": story.story_type,
                 "views": story.views,
                 "likes": story.likes,
                 "created_at": story.created_at
@@ -575,6 +581,7 @@ async def update_story(
     desc: Optional[str] = Form(None),
     timeline_id: Optional[int] = Form(None),
     story_date: Optional[date] = Form(None),
+    story_type: Optional[int] = Form(None),
     timestamps_json: Optional[str] = Form(None),
     thumbnail_file: Optional[UploadFile] = File(None),
     video_file: Optional[UploadFile] = File(None),
@@ -601,6 +608,8 @@ async def update_story(
         update_data["timeline_id"] = timeline_id
     if story_date is not None:
         update_data["story_date"] = story_date
+    if story_type is not None:
+        update_data["story_type"] = story_type
     
     # Validate with Pydantic if there's data to update
     if update_data:
@@ -724,6 +733,7 @@ async def update_story(
                 "video_url": updated_story.video_url,
                 "timeline_id": updated_story.timeline_id,
                 "story_date": updated_story.story_date,
+                "story_type": updated_story.story_type,
                 "views": updated_story.views,
                 "likes": updated_story.likes,
                 "created_at": updated_story.created_at

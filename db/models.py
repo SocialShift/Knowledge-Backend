@@ -7,7 +7,7 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_f8o6_user:TTNU3ipJcBPMtKJIhPYXutzrO3VS5CKr@dpg-cvbr42jtq21c73e2dvhg-a.oregon-postgres.render.com/knowledge_f8o6"
+DATABASE_URL = "postgresql://knowledge_wn1j_user:qj78wm7r7qwMp5LfiEU0m9oNK1lj6702@dpg-cvcpttfnoe9s73a1j2lg-a.oregon-postgres.render.com/knowledge_wn1j"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -37,6 +37,20 @@ class Pronouns(str, enum.Enum):
     SHE_HER = "She/Her"
     THEY_THEM = "They/Them"
     OTHER = "Other"
+
+class StoryType(enum.IntEnum):
+    DOCUMENTARY = 1
+    BIOGRAPHY = 2
+    HISTORICAL_EVENT = 3
+    SCIENTIFIC_DISCOVERY = 4
+    CULTURAL_PHENOMENON = 5
+    TECHNOLOGICAL_ADVANCEMENT = 6
+    EDUCATIONAL = 7
+    MYTHOLOGICAL = 8
+    ENVIRONMENTAL = 9
+    POLITICAL = 10
+    SOCIAL_MOVEMENT = 11
+    ARTISTIC_DEVELOPMENT = 12
 
 class Location(str, enum.Enum):
     ALABAMA = "Alabama"
@@ -196,8 +210,9 @@ class Story(Base):
     story_date= Column(Date, nullable=False)
     title = Column(String(100), nullable=False)
     desc = Column(Text)
+    story_type = Column(Integer, nullable=True)  # Using the StoryType enum
     thumbnail_url = Column(String(255), unique=True)
-    video_url = Column(String(255), unique=True)
+    video_url = Column(String(255), unique=True, nullable=True)
     likes = Column(Integer, default=0)
     views = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
