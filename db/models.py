@@ -7,7 +7,7 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_wn1j_user:qj78wm7r7qwMp5LfiEU0m9oNK1lj6702@dpg-cvcpttfnoe9s73a1j2lg-a.oregon-postgres.render.com/knowledge_wn1j"
+DATABASE_URL = "postgresql://knowledge_3mmv_user:KW20XFSxFdc2KzEgQhIgNCY4cIhLFdxj@dpg-cvdh89t6l47c73949j9g-a.oregon-postgres.render.com/knowledge_3mmv"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -270,4 +270,16 @@ class QuizAttempt(Base):
 
     __table_args__ = (
         UniqueConstraint('user_id', 'quiz_id', name='unique_user_quiz'),
+    )
+
+class UserStoryLike(Base):
+    __tablename__ = "user_story_likes"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    story_id = Column(Integer, ForeignKey("stories.id", ondelete="CASCADE"))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'story_id', name='unique_user_story_like'),
     )

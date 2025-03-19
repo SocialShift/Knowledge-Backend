@@ -8,7 +8,7 @@ from schemas.stories_timelines import (
 from schemas.users import LeaderboardEntryModel, LeaderboardResponseModel
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType
+from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType, UserStoryLike
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
 from fastapi.responses import JSONResponse
@@ -1085,3 +1085,55 @@ async def get_user_points(
         "points": profile.points,
         "completed_quizzes": completed_quizzes
     }
+
+@router.post('/story/{story_id}/like')
+async def like_story(
+    story_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Like or unlike a story"""
+    # Check if story exists
+    story = db.query(Story).filter(Story.id == story_id).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    
+    # Check if user already liked this story
+    existing_like = db.query(UserStoryLike).filter(
+        UserStoryLike.user_id == current_user.id, 
+        UserStoryLike.story_id == story_id
+    ).first()
+    
+    if existing_like:
+        # Unlike: remove the like record and decrement story likes
+        db.delete(existing_like)
+        story.likes = max(0, story.likes - 1)  # Ensure likes doesn't go below 0
+        db.commit()
+        return {"likes": story.likes, "liked": False}
+    else:
+        # Like: create new like record and increment story likes
+        new_like = UserStoryLike(user_id=current_user.id, story_id=story_id)
+        db.add(new_like)
+        story.likes += 1
+        db.commit()
+        return {"likes": story.likes, "liked": True}
+
+@router.get('/story/{story_id}/liked')
+async def check_story_liked(
+    story_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Check if the current user has liked a story"""
+    # Check if story exists
+    story = db.query(Story).filter(Story.id == story_id).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    
+    # Check if user liked this story
+    liked = db.query(UserStoryLike).filter(
+        UserStoryLike.user_id == current_user.id, 
+        UserStoryLike.story_id == story_id
+    ).first() is not None
+    
+    return {"story_id": story_id, "likes": story.likes, "liked": liked}
