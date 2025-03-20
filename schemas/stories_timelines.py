@@ -9,16 +9,19 @@ class OnThisDayCreateModel(BaseModel):
     date: date
     title: str
     short_desc: str
-    image_file: UploadFile = None
-    story_id: int = None  # Can be linked to a Story
+    image_file: Optional[UploadFile] = None
+    story_id: Optional[int] = None  # Can be linked to a Story
+    
+    class Config:
+        arbitrary_types_allowed = True
 
 class OnThisDayResponseModel(BaseModel):
     id: int
     date: date
     title: str
     short_desc: str
-    image_url: str = None
-    story_id: int = None
+    image_url: Optional[str] = None
+    story_id: Optional[int] = None
     created_at: datetime
 
     class Config:
@@ -28,6 +31,7 @@ class TimelineCreateModel(BaseModel):
     title: str
     year_range: str
     overview: str
+    main_character_id: Optional[int] = None
 
     @field_validator('title')
     def title_must_not_be_empty(cls, v):
@@ -42,6 +46,7 @@ class TimelineUpdateModel(BaseModel):
     title: str = None
     year_range: str = None
     overview: str = None
+    main_character_id: Optional[int] = None
 
 class TimeStampCreateModel(BaseModel):
     time_sec: int = Field(..., gt=0, description="Timestamp in seconds")  # Must be greater than 0
@@ -149,6 +154,28 @@ class QuizAttemptResponseModel(BaseModel):
     score: int
     created_at: datetime
     completed_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+class CharacterCreateModel(BaseModel):
+    persona: str
+    avatar_file: UploadFile = None
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+class CharacterUpdateModel(BaseModel):
+    persona: str = None
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+class CharacterResponseModel(BaseModel):
+    id: int
+    persona: str
+    avatar_url: Optional[str] = None
+    created_at: datetime
     
     class Config:
         from_attributes = True

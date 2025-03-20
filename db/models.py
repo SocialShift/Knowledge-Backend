@@ -7,7 +7,7 @@ import enum
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_3mmv_user:KW20XFSxFdc2KzEgQhIgNCY4cIhLFdxj@dpg-cvdh89t6l47c73949j9g-a.oregon-postgres.render.com/knowledge_3mmv"
+DATABASE_URL = "postgresql://knowledge_5a2i_user:EiMtZxULV5GZMhyCqQq4HXcFXcVIXoXp@dpg-cve1e11c1ekc73ebeetg-a.oregon-postgres.render.com/knowledge_5a2i"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -178,6 +178,15 @@ class OnThisDay(Base):
     story = relationship("Story", back_populates="on_this_day")  # Connects to Story
 
 
+class Character(Base):
+    __tablename__= "characters"
+
+    id= Column(Integer, primary_key=True)
+    avatar_url= Column(String(255), unique=True, nullable=True)
+    persona= Column(Text, nullable=False)
+    created_at= Column(DateTime, default=datetime.utcnow)
+    
+
 class Timeline(Base):
     __tablename__ = "timelines"
 
@@ -186,10 +195,12 @@ class Timeline(Base):
     thumbnail_url = Column(String(255), unique=True)
     year_range = Column(String(50), nullable=False)
     overview = Column(Text)
+    main_character_id = Column(Integer, ForeignKey("characters.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship with Stories
     stories = relationship("Story", back_populates="timeline", cascade="all, delete-orphan")
+    main_character = relationship("Character")
 
 class Timestamp(Base):
     __tablename__ = "timestamps"

@@ -3,12 +3,12 @@ from schemas.stories_timelines import (
     TimelineCreateModel, StoryCreateModel, OnThisDayCreateModel, OnThisDayResponseModel, 
     TimelineUpdateModel, StoryUpdateModel, TimeStampCreateModel, QuizCreateModel, 
     QuizResponseModel, QuestionCreateModel, OptionCreateModel, QuizUpdateModel, QuizSubmissionModel,
-    QuizAttemptResponseModel
+    QuizAttemptResponseModel, CharacterCreateModel, CharacterUpdateModel, CharacterResponseModel
 )
 from schemas.users import LeaderboardEntryModel, LeaderboardResponseModel
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType, UserStoryLike
+from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType, UserStoryLike, Character
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
 from fastapi.responses import JSONResponse
@@ -65,9 +65,12 @@ async def create_otd(
             delete_file(image_url)
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/list/otd", response_model=list[OnThisDayResponseModel])
+@router.get("/list/otd")
 def get_all_otd(db: Session = Depends(get_db)):
-    return db.query(OnThisDay).all()
+    otd_entries = db.query(OnThisDay).all()
+    return otd_entries
+    # Convert each entry to a dictionary with proper None handling
+    #return [otd_to_dict(entry) for entry in otd_entries]
 
 @router.get('/leaderboard', response_model=LeaderboardResponseModel)
 async def get_leaderboard(
@@ -146,12 +149,14 @@ async def get_user_rank(
         "max_streak": user_profile.max_login_streak
     }
 
-@router.get("/otd/date/{date}", response_model=OnThisDayResponseModel)
+@router.get("/otd/date/{date}")
 def get_otd_by_date(date: date, db: Session = Depends(get_db)):
     otd_entry = db.query(OnThisDay).filter(OnThisDay.date == date).first()
     if not otd_entry:
         raise HTTPException(status_code=404, detail="No historical event found for this date")
-    return otd_entry
+    
+    # Convert to dictionary with proper None handling
+    return (otd_entry)
 
 @router.delete("/otd/{id}")
 def delete_otd(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -176,6 +181,7 @@ async def create_timeline(
     title: str = Form(...),
     year_range: str = Form(...),
     overview: str = Form(...),
+    main_character_id: Optional[int] = Form(None),
     thumbnail_file: UploadFile = File(...),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
@@ -185,7 +191,8 @@ async def create_timeline(
         validated_data = TimelineCreateModel(
             title=title,
             year_range=year_range,
-            overview=overview
+            overview=overview,
+            main_character_id=main_character_id
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
@@ -198,7 +205,8 @@ async def create_timeline(
         title = validated_data.title,
         thumbnail_url = thumbnail_url,
         year_range = validated_data.year_range,
-        overview = validated_data.overview
+        overview = validated_data.overview,
+        main_character_id = validated_data.main_character_id
     )
     
     db.add(new_timeline)
@@ -219,7 +227,30 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
     if not timeline_obj:
         raise HTTPException(detail="TimeLine Not Found", status_code=status.HTTP_404_NOT_FOUND)
     
-    return timeline_obj
+    # Get main character info if exists
+    main_character = None
+    if timeline_obj.main_character_id:
+        character = db.query(Character).filter(Character.id == timeline_obj.main_character_id).first()
+        if character:
+            main_character = {
+                "id": character.id,
+                "avatar_url": character.avatar_url,
+                "persona": character.persona,
+                "created_at": character.created_at
+            }
+    
+    # Create response with timeline and main character
+    response = {
+        "id": timeline_obj.id,
+        "title": timeline_obj.title,
+        "year_range": timeline_obj.year_range,
+        "overview": timeline_obj.overview,
+        "thumbnail_url": timeline_obj.thumbnail_url,
+        "created_at": timeline_obj.created_at,
+        "main_character": main_character
+    }
+    
+    return response
 
 @router.get('/list/timelines')
 async def get_timelines(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
@@ -232,6 +263,7 @@ async def update_timeline(
     title: Optional[str] = Form(None),
     year_range: Optional[str] = Form(None),
     overview: Optional[str] = Form(None),
+    main_character_id: Optional[int] = Form(None),
     thumbnail_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -253,6 +285,8 @@ async def update_timeline(
         update_data["year_range"] = year_range
     if overview is not None:
         update_data["overview"] = overview
+    if main_character_id is not None:
+        update_data["main_character_id"] = main_character_id
     
     # Validate with Pydantic if there's data to update
     if update_data:
@@ -1137,3 +1171,165 @@ async def check_story_liked(
     ).first() is not None
     
     return {"story_id": story_id, "likes": story.likes, "liked": liked}
+
+@router.get('/list/characters')
+async def get_characters(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Get a list of all characters for selection in timelines"""
+    characters = db.query(Character).all()
+    
+    # Format response
+    response = []
+    for character in characters:
+        character_data = {
+            "id": character.id,
+            "persona": character.persona,
+            "avatar_url": character.avatar_url,
+            "created_at": character.created_at
+        }
+        response.append(character_data)
+    
+    return response
+
+@router.post('/character/create', response_model=CharacterResponseModel)
+async def create_character(
+    persona: str = Form(...),
+    avatar_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user)  # Only admins can create characters
+):
+    """Create a new character"""
+    try:
+        # Validate with Pydantic
+        validated_data = CharacterCreateModel(
+            persona=persona
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+    
+    # Save avatar if provided
+    avatar_url = await save_image(avatar_file) if avatar_file else None
+    
+    # Create character
+    new_character = Character(
+        persona=validated_data.persona,
+        avatar_url=avatar_url
+    )
+    
+    db.add(new_character)
+    try:
+        db.commit()
+        db.refresh(new_character)
+        return new_character
+    except Exception as e:
+        db.rollback()
+        # Delete the uploaded file if there was an error
+        if avatar_url:
+            delete_file(avatar_url)
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get('/character/{character_id}', response_model=CharacterResponseModel)
+async def get_character(
+    character_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get character details"""
+    character = db.query(Character).filter(Character.id == character_id).first()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    return character
+
+@router.patch('/character/update/{character_id}', response_model=CharacterResponseModel)
+async def update_character(
+    character_id: int,
+    persona: Optional[str] = Form(None),
+    avatar_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user)  # Only admins can update characters
+):
+    """Update a character"""
+    # Check if character exists
+    character_query = db.query(Character).filter(Character.id == character_id)
+    character = character_query.first()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    # Create update data dictionary
+    update_data = {}
+    if persona is not None:
+        update_data["persona"] = persona
+    
+    # Validate with Pydantic if there's data to update
+    if update_data:
+        try:
+            validated_data = CharacterUpdateModel(**update_data)
+            update_data = {k: v for k, v in validated_data.dict().items() if v is not None}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
+    
+    # Handle avatar update
+    old_avatar = None
+    if avatar_file:
+        old_avatar = character.avatar_url
+        update_data["avatar_url"] = await save_image(avatar_file)
+    
+    if not update_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid fields to update"
+        )
+    
+    # Update character
+    try:
+        character_query.update(update_data, synchronize_session=False)
+        db.commit()
+        
+        # Delete old avatar if it was replaced
+        if old_avatar and avatar_file:
+            delete_file(old_avatar)
+            
+        return character_query.first()
+    except Exception as e:
+        db.rollback()
+        # Delete the new avatar if there was an error
+        if avatar_file and "avatar_url" in update_data:
+            delete_file(update_data["avatar_url"])
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete('/character/{character_id}')
+async def delete_character(
+    character_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user)  # Only admins can delete characters
+):
+    """Delete a character"""
+    # Check if character exists
+    character = db.query(Character).filter(Character.id == character_id).first()
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+    
+    # Check if character is used in any timeline
+    timeline_with_character = db.query(Timeline).filter(Timeline.main_character_id == character_id).first()
+    if timeline_with_character:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete character that is being used in timeline: {timeline_with_character.title}"
+        )
+    
+    # Store avatar URL for deletion after character is removed
+    avatar_url = character.avatar_url
+    
+    # Delete character
+    try:
+        db.delete(character)
+        db.commit()
+        
+        # Delete avatar if it exists
+        if avatar_url:
+            delete_file(avatar_url)
+            
+        return {"detail": "Character deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
