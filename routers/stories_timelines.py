@@ -332,7 +332,7 @@ async def update_timeline(
 async def delete_timeline(
     timeline_id: int, 
     db: Session = Depends(get_db), 
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
     timeline_obj = db.query(Timeline).filter(Timeline.id == timeline_id).first()
     if not timeline_obj:
@@ -795,7 +795,7 @@ async def update_story(
 async def delete_story(
     story_id: int, 
     db: Session = Depends(get_db), 
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
     story_obj = db.query(Story).filter(Story.id == story_id).first()
     if not story_obj:
@@ -978,7 +978,7 @@ async def update_quiz(
 async def delete_quiz(
     quiz_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)
+    current_user: User = Depends(get_current_user)
 ):
     # Check if the quiz exists
     quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
@@ -1195,7 +1195,7 @@ async def create_character(
     persona: str = Form(...),
     avatar_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)  # Only admins can create characters
+    current_user: User = Depends(get_current_user)  # Only admins can create characters
 ):
     """Create a new character"""
     try:
@@ -1246,7 +1246,7 @@ async def update_character(
     persona: Optional[str] = Form(None),
     avatar_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)  # Only admins can update characters
+    current_user: User = Depends(get_current_user)  # Only admins can update characters
 ):
     """Update a character"""
     # Check if character exists
@@ -1301,7 +1301,7 @@ async def update_character(
 async def delete_character(
     character_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_user)  # Only admins can delete characters
+    current_user: User = Depends(get_current_user)  # Only admins can delete characters
 ):
     """Delete a character"""
     # Check if character exists
