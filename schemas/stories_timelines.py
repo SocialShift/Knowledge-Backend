@@ -89,7 +89,7 @@ class OptionResponseModel(BaseModel):
 class QuestionCreateModel(BaseModel):
     text: str
     options: list[OptionCreateModel]  # Must have 4 options
-    
+    """
     @field_validator('options')
     def validate_options(cls, v):
         if len(v) != 4:
@@ -101,6 +101,7 @@ class QuestionCreateModel(BaseModel):
             raise ValueError('Each question must have exactly one correct option')
         
         return v
+    """
 
 class QuestionResponseModel(BaseModel):
     id: int

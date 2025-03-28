@@ -12,6 +12,8 @@ import json
 import time
 from datetime import datetime, date
 import uuid
+import base64
+from io import BytesIO
 
 load_dotenv()
 
@@ -48,31 +50,80 @@ def create_assistant():
     """Create an assistant specialized in historical content about underrepresented groups"""
     assistant = client.beta.assistants.create(
         name="History Education Content Creator",
-        instructions="""You are a specialized assistant for an educational history application focused on the stories and contributions of underrepresented groups throughout history, including women, Black individuals, LGBTQ+ people, indigenous populations, and other marginalized communities. 
+        instructions="""You are a specialized assistant for an educational history application focused on the stories and contributions of underrepresented groups throughout history, including women, Black individuals, LGBTQ+ people, indigenous populations, and other marginalized communities.
 
-Your primary role is to create historically accurate and engaging educational content that highlights the struggles, achievements, and impacts of these individuals and groups.
+Your primary role is to create historically accurate, engaging, and HIGHLY DETAILED educational content that highlights the struggles, achievements, and impacts of these individuals and groups.
 
 When generating content:
-1. Focus on historically accurate information with proper context
+1. Focus on historically accurate information with proper context and deep detail
 2. Emphasize perspectives and stories that may have been overlooked in traditional historical narratives
 3. Create content that is educational, engaging, and appropriate for a diverse audience
-4. Include important dates, events, key figures, and cultural/social impacts
+4. Include important dates, events, key figures, and cultural/social impacts with rich context
 5. Ensure representation across different time periods and geographical regions
+6. Provide EXTENSIVE descriptions and narratives - each story should be comprehensive, at least 5-7 paragraphs, with rich supporting details
 
 You should structure content in the form of:
-- Character profiles representing historical figures
-- Timelines of important movements or periods
-- Individual stories within those timelines that highlight specific events or achievements
+- Character profiles representing historical figures with detailed biographies and contributions
+- Timelines of important movements or periods with precise date ranges
+- Individual stories within those timelines that highlight specific events or achievements with rich narrative
 - Educational quizzes with meaningful questions that test understanding of the content
 
-Always maintain sensitivity and respect when discussing historical injustices and struggles while celebrating the resilience, achievements, and contributions of these groups.""",
+Each story must be SUBSTANTIVE and COMPREHENSIVE. Think of creating college-level educational material that provides a thorough understanding of the subject matter.
+
+Always maintain sensitivity and respect when discussing historical injustices and struggles while celebrating the resilience, achievements, and contributions of these groups.
+
+For quizzes, always create exactly 4 options for each question, with only one correct answer.""",
         model="gpt-4o",
     )
     
     return assistant
 
+def generate_image(prompt, size="1024x1024"):
+    """Generate an image using DALL-E 3 based on the description"""
+    try:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=f"Create a historically accurate, detailed educational image related to: {prompt}. The image should be high quality, realistic, and appropriate for an educational platform about history.",
+            size=size,
+            quality="standard",
+            n=1,
+        )
+        
+        # Save the image to a file
+        image_url = response.data[0].url
+        
+        # Download the image
+        image_response = requests.get(image_url)
+        
+        # Create directory if it doesn't exist
+        image_dir = "generated_media"
+        os.makedirs(image_dir, exist_ok=True)
+        
+        # Save to file
+        image_filename = f"{image_dir}/{uuid.uuid4()}.png"
+        with open(image_filename, "wb") as f:
+            f.write(image_response.content)
+        
+        return image_filename
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        # Fall back to placeholder if image generation fails
+        return create_placeholder_image()
+
+def create_placeholder_image():
+    """Create a placeholder image if DALL-E fails"""
+    image_dir = "generated_media"
+    os.makedirs(image_dir, exist_ok=True)
+    
+    # Create a small dummy file
+    image_filename = f"{image_dir}/placeholder_{uuid.uuid4()}.jpg"
+    with open(image_filename, 'wb') as f:
+        f.write(b'\x00' * 100)
+    
+    return image_filename
+
 # API Helpers
-def upload_media(file_path, url, form_data):
+def upload_media(url, form_data):
     """Upload media file with form data to the given URL"""
     headers = {"Cookie": f"session_cookie={AUTH_COOKIE}"}
     
@@ -81,7 +132,8 @@ def upload_media(file_path, url, form_data):
         if key.endswith('_file') and isinstance(value, str) and os.path.exists(value):
             files[key] = (os.path.basename(value), open(value, 'rb'), 'application/octet-stream')
         else:
-            form_data[key] = value
+            if key not in files:  # Avoid duplicate keys
+                form_data[key] = value
     
     response = requests.post(url, headers=headers, data=form_data, files=files)
     
@@ -92,21 +144,31 @@ def upload_media(file_path, url, form_data):
     
     return response.json()
 
-def create_character(persona, avatar_file_path):
-    """Create a character with the given persona and avatar"""
+def create_character(persona, avatar_description):
+    """Create a character with the given persona and generated avatar"""
     url = f"{BASE_URL}/character/create"
+    
+    # Generate character image using DALL-E
+    print(f"Generating image for character: {persona}")
+    avatar_file_path = generate_image(f"Historical portrait of {avatar_description}")
+    
     form_data = {
         "persona": persona,
         "avatar_file": avatar_file_path
     }
     
-    response = upload_media(avatar_file_path, url, form_data)
+    response = upload_media(url, form_data)
     print(f"Character created: {response}")
-    return response
+    return response, avatar_file_path
 
-def create_timeline(title, year_range, overview, main_character_id, thumbnail_file_path):
-    """Create a timeline with the given details"""
+def create_timeline(title, year_range, overview, main_character_id, timeline_description):
+    """Create a timeline with the given details and generated thumbnail"""
     url = f"{BASE_URL}/timeline/create"
+    
+    # Generate timeline image
+    print(f"Generating image for timeline: {title}")
+    thumbnail_file_path = generate_image(f"Historical representation of {timeline_description} during {year_range}")
+    
     form_data = {
         "title": title,
         "year_range": year_range,
@@ -115,16 +177,23 @@ def create_timeline(title, year_range, overview, main_character_id, thumbnail_fi
         "thumbnail_file": thumbnail_file_path
     }
     
-    response = upload_media(thumbnail_file_path, url, form_data)
+    response = upload_media(url, form_data)
     print(f"Timeline created: {response}")
-    return response
+    return response, thumbnail_file_path
 
-def create_story(timeline_id, title, desc, story_date, story_type, thumbnail_file_path, video_file_path, timestamps=None):
-    """Create a story within a timeline"""
+def create_story(timeline_id, title, desc, story_date, story_type, story_description, timestamps=None):
+    """Create a story within a timeline with generated media"""
     url = f"{BASE_URL}/{timeline_id}/story/create"
     
     if timestamps is None:
         timestamps = []
+    
+    # Generate story images
+    print(f"Generating image for story: {title}")
+    thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
+    
+    # Use the same image for video for now
+    video_file_path = thumbnail_file_path
     
     form_data = {
         "title": title,
@@ -136,9 +205,9 @@ def create_story(timeline_id, title, desc, story_date, story_type, thumbnail_fil
         "video_file": video_file_path
     }
     
-    response = upload_media(thumbnail_file_path, url, form_data)
+    response = upload_media(url, form_data)
     print(f"Story created: {response}")
-    return response
+    return response, thumbnail_file_path
 
 def create_quiz(story_id, questions):
     """Create a quiz for a story"""
@@ -148,45 +217,47 @@ def create_quiz(story_id, questions):
         "Content-Type": "application/json"
     }
     
+    # Ensure each question has exactly 4 options
+    validated_questions = []
+    for question in questions:
+        # If there are fewer than 4 options, add dummy options
+        options = question.get('options', [])
+        while len(options) < 4:
+            options.append({
+                "text": f"Option {len(options) + 1}",
+                "is_correct": False
+            })
+        
+        # If there are more than 4 options, trim to 4, keeping the correct one
+        if len(options) > 4:
+            # Find the correct option
+            correct_option = next((opt for opt in options if opt.get('is_correct', False)), None)
+            
+            # Select 3 incorrect options
+            incorrect_options = [opt for opt in options if not opt.get('is_correct', False)][:3]
+            
+            # Combine correct and incorrect options
+            options = incorrect_options + [correct_option] if correct_option else incorrect_options[:4]
+        
+        validated_questions.append({
+            "text": question.get('text', ""),
+            "options": options
+        })
+    
     quiz_data = {
-        "questions": questions
+        "questions": validated_questions
     }
     
-    response = requests.post(url, headers=headers, json=quiz_data)
-    print(f"Quiz created: {response.json()}")
-    return response.json()
-
-def download_placeholder_image(category):
-    """Download a placeholder image based on category"""
-    # For now, using local placeholder images - in production you'd use real images
-    placeholder_dir = "placeholder_media"
-    os.makedirs(placeholder_dir, exist_ok=True)
-    
-    image_filename = f"{placeholder_dir}/{category}_{uuid.uuid4()}.jpg"
-    video_filename = f"{placeholder_dir}/video_{uuid.uuid4()}.mp4"
-    
-    # In a real implementation, you might want to download relevant images
-    # For now, copy placeholder files if they exist or create empty ones
-    placeholder_image = "placeholder.jpg"
-    placeholder_video = "placeholder.mp4"
-    
-    if os.path.exists(placeholder_image):
-        import shutil
-        shutil.copy(placeholder_image, image_filename)
-    else:
-        # Create a small dummy file
-        with open(image_filename, 'wb') as f:
-            f.write(b'\x00' * 100)
-    
-    if os.path.exists(placeholder_video):
-        import shutil
-        shutil.copy(placeholder_video, video_filename)
-    else:
-        # Create a small dummy file
-        with open(video_filename, 'wb') as f:
-            f.write(b'\x00' * 100)
-    
-    return image_filename, video_filename
+    try:
+        response = requests.post(url, headers=headers, json=quiz_data)
+        response_json = response.json()
+        print(f"Quiz created: {response_json}")
+        return response_json
+    except Exception as e:
+        print(f"Error creating quiz: {e}")
+        print(f"Response status: {response.status_code}")
+        print(f"Response text: {response.text}")
+        return {"error": str(e)}
 
 def generate_content(user_query, thread):
     """Generate historical content based on user query"""
@@ -197,7 +268,15 @@ def generate_content(user_query, thread):
     client.beta.threads.messages.create(
         thread_id=thread.id,
         role="user",
-        content=f"I want to create educational content about '{user_query}'. Please provide ideas for a character, timeline, stories, and quiz questions focused on this topic. Focus on historically accurate information about underrepresented groups."
+        content=f"""I want to create detailed, comprehensive educational content about '{user_query}' for our history education platform. 
+
+Please provide extensive, richly detailed ideas for:
+1. A character profile (historical figure or composite representative)
+2. A timeline with precise year range
+3. At least 3 detailed stories within that timeline (each should be substantial, 5-7 paragraphs)
+4. Quiz questions for each story (with 4 options per question)
+
+Focus on historically accurate information about underrepresented groups. The content should be college-level depth and detail while remaining engaging."""
     )
     
     # Run the assistant
@@ -240,10 +319,50 @@ def process_content(content):
         role="user",
         content=f"""Please structure the following content into a JSON format with these keys:
         
-        1. character: {{persona, avatar_description}}
-        2. timeline: {{title, year_range, overview}}
-        3. stories: [{{title, desc, story_date (YYYY-MM-DD), story_type (1-12), timestamps}}]
-        4. quizzes: [{{story_index, questions: [{{text, options: [{{text, is_correct}}]}}]}}]
+        1. character: {{
+            "persona": "Detailed description of the historical figure",
+            "avatar_description": "Description for generating an image of this character"
+        }}
+        
+        2. timeline: {{
+            "title": "Title of the timeline",
+            "year_range": "YYYY-YYYY",
+            "overview": "Comprehensive overview of the timeline",
+            "description": "Visual description for generating an image representing this timeline"
+        }}
+        
+        3. stories: [
+            {{
+                "title": "Story title",
+                "desc": "Detailed story description (keep all paragraphs)",
+                "story_date": "YYYY-MM-DD",
+                "story_type": 1-12 (use the number),
+                "description": "Visual description for generating an image representing this story",
+                "timestamps": [
+                    {{"time_sec": 30, "label": "Introduction"}},
+                    {{"time_sec": 60, "label": "Event starts"}},
+                    {{"time_sec": 120, "label": "Key moment"}},
+                    {{"time_sec": 180, "label": "Conclusion"}}
+                ]
+            }}
+        ]
+        
+        4. quizzes: [
+            {{
+                "story_index": 0, (0-based index matching the stories array)
+                "questions": [
+                    {{
+                        "text": "Question text?",
+                        "options": [
+                            {{"text": "Option 1", "is_correct": true}},
+                            {{"text": "Option 2", "is_correct": false}},
+                            {{"text": "Option 3", "is_correct": false}},
+                            {{"text": "Option 4", "is_correct": false}}
+                        ]
+                    }}
+                ]
+            }}
+        ]
         
         Here's the content to structure:
         
@@ -254,7 +373,11 @@ def process_content(content):
         5: CULTURAL_PHENOMENON, 6: TECHNOLOGICAL_ADVANCEMENT, 7: EDUCATIONAL,
         8: MYTHOLOGICAL, 9: ENVIRONMENTAL, 10: POLITICAL, 11: SOCIAL_MOVEMENT, 12: ARTISTIC_DEVELOPMENT
         
-        For timestamps, include at least 2 timestamps per story with format: [{{time_sec: 30, label: "Introduction"}}, ...]
+        IMPORTANT: 
+        1. Each question MUST have EXACTLY 4 options
+        2. Each story MUST have a corresponding quiz in the quizzes array
+        3. Preserve all paragraph breaks and formatting in the descriptions
+        4. Add an appropriate image description for each element
         """
     )
     
@@ -303,7 +426,30 @@ def process_content(content):
                     else:
                         raise ValueError("Could not find JSON content in response")
                 
-                return json.loads(json_str)
+                structured_data = json.loads(json_str)
+                
+                # Validate each quiz has exactly 4 options
+                for quiz in structured_data.get("quizzes", []):
+                    for question in quiz.get("questions", []):
+                        options = question.get("options", [])
+                        if len(options) != 4:
+                            print(f"Warning: Question '{question.get('text')}' has {len(options)} options instead of 4")
+                            # Add dummy options if needed
+                            while len(options) < 4:
+                                options.append({
+                                    "text": f"Option {len(options) + 1}",
+                                    "is_correct": False
+                                })
+                            # Trim if too many
+                            if len(options) > 4:
+                                has_correct = any(opt.get("is_correct", False) for opt in options[:4])
+                                if not has_correct:
+                                    # Make sure we have one correct option
+                                    options[0]["is_correct"] = True
+                                options = options[:4]
+                            question["options"] = options
+                
+                return structured_data
             except Exception as e:
                 print(f"Error parsing JSON: {e}")
                 print(f"Content received: {content}")
@@ -393,78 +539,81 @@ def main():
             
             print("\nCreating content in the system...")
             
+            created_files = []
             try:
-                # Download placeholder media files
-                character_image, _ = download_placeholder_image("character")
-                timeline_image, _ = download_placeholder_image("timeline")
-                
                 # 1. Create character
                 print("\nCreating character...")
-                character_response = create_character(
+                character_response, character_image = create_character(
                     structured_data["character"]["persona"],
-                    character_image
+                    structured_data["character"]["avatar_description"]
                 )
-                character_id = character_response.get("id")
+                created_files.append(character_image)
                 
+                character_id = character_response.get("id")
                 if not character_id:
                     print("Failed to create character.")
                     continue
                 
                 # 2. Create timeline
                 print("\nCreating timeline...")
-                timeline_response = create_timeline(
+                timeline_response, timeline_image = create_timeline(
                     structured_data["timeline"]["title"],
                     structured_data["timeline"]["year_range"],
                     structured_data["timeline"]["overview"],
                     character_id,
-                    timeline_image
+                    structured_data["timeline"]["description"]
                 )
-                timeline_id = timeline_response.get("id")
+                created_files.append(timeline_image)
                 
+                timeline_id = timeline_response.get("id")
                 if not timeline_id:
                     print("Failed to create timeline.")
                     continue
                 
                 # 3. Create stories and quizzes
                 for i, story_data in enumerate(structured_data["stories"]):
-                    story_image, story_video = download_placeholder_image(f"story_{i}")
-                    
                     # Create story
                     print(f"\nCreating story {i+1}: {story_data['title']}...")
-                    story_response = create_story(
+                    story_response, story_image = create_story(
                         timeline_id,
                         story_data["title"],
                         story_data["desc"],
                         story_data.get("story_date", datetime.now().strftime("%Y-%m-%d")),
                         story_data.get("story_type", 7),  # Default to EDUCATIONAL
-                        story_image,
-                        story_video,
+                        story_data["description"],
                         story_data.get("timestamps", [])
                     )
+                    created_files.append(story_image)
                     
-                    story_id = story_response.get("story", {}).get("id")
+                    # Extract story ID directly from the response
+                    story_id = None
+                    if isinstance(story_response, dict) and "story" in story_response:
+                        story_id = story_response["story"].get("id")
                     
                     if not story_id:
-                        print(f"Failed to create story {i+1}.")
+                        print(f"Failed to create story {i+1} or extract story ID.")
+                        print(f"Story response: {story_response}")
                         continue
                     
-                    # Create quiz for this story
-                    for quiz_data in structured_data["quizzes"]:
-                        if quiz_data.get("story_index") == i:
-                            print(f"\nCreating quiz for story {i+1}...")
-                            quiz_response = create_quiz(story_id, quiz_data["questions"])
-                            break
+                    # Find corresponding quiz for this story
+                    matching_quizzes = [q for q in structured_data["quizzes"] if q.get("story_index") == i]
+                    
+                    if matching_quizzes:
+                        # Create quiz for this story
+                        print(f"\nCreating quiz for story {i+1} (ID: {story_id})...")
+                        quiz_response = create_quiz(story_id, matching_quizzes[0]["questions"])
+                    else:
+                        print(f"No quiz found for story index {i}")
                 
                 print("\nContent creation completed successfully!")
                 
                 # Clean up media files
-                cleanup = input("\nDo you want to clean up temporary media files? (yes/no): ").lower()
+                cleanup = input("\nDo you want to clean up generated media files? (yes/no): ").lower()
                 if cleanup == "yes":
-                    import shutil
-                    placeholder_dir = "placeholder_media"
-                    if os.path.exists(placeholder_dir):
-                        shutil.rmtree(placeholder_dir)
-                        print("Temporary media files cleaned up.")
+                    for file in created_files:
+                        if os.path.exists(file):
+                            os.remove(file)
+                    print("Generated media files cleaned up.")
                 
             except Exception as e:
                 print(f"Error creating content: {e}")
