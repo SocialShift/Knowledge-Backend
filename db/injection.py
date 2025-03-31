@@ -148,6 +148,12 @@ def create_character(persona, avatar_description):
     """Create a character with the given persona and generated avatar"""
     url = f"{BASE_URL}/character/create"
     
+    # Enforce brevity in persona
+    words = persona.split()
+    if len(words) > 7:
+        persona = " ".join(words[:7])
+        print("Character persona trimmed to ensure brevity.")
+    
     # Generate character image using DALL-E
     print(f"Generating image for character: {persona}")
     avatar_file_path = generate_image(f"Historical portrait of {avatar_description}")
@@ -164,6 +170,12 @@ def create_character(persona, avatar_description):
 def create_timeline(title, year_range, overview, main_character_id, timeline_description):
     """Create a timeline with the given details and generated thumbnail"""
     url = f"{BASE_URL}/timeline/create"
+    
+    # Enforce brevity in title
+    words = title.split()
+    if len(words) > 5:
+        title = " ".join(words[:5])
+        print("Timeline title trimmed to ensure brevity.")
     
     # Generate timeline image
     print(f"Generating image for timeline: {title}")
@@ -184,6 +196,12 @@ def create_timeline(title, year_range, overview, main_character_id, timeline_des
 def create_story(timeline_id, title, desc, story_date, story_type, story_description, timestamps=None):
     """Create a story within a timeline with generated media"""
     url = f"{BASE_URL}/{timeline_id}/story/create"
+    
+    # Enforce brevity in title
+    words = title.split()
+    if len(words) > 5:
+        title = " ".join(words[:5])
+        print("Story title trimmed to ensure brevity.")
     
     if timestamps is None:
         timestamps = []
@@ -272,12 +290,14 @@ def generate_content(user_query, thread):
         content=f"""I want to create detailed, comprehensive educational content about '{user_query}' for our history education platform. 
 
 Please provide extensive, richly detailed ideas for:
-1. A character profile (historical figure or composite representative)
-2. A timeline with precise year range
-3. At least 3 detailed stories within that timeline (each should be substantial, 5-7 paragraphs)
+1. A character profile (historical figure or composite representative) with a VERY BRIEF persona description (3-5 words)
+2. A timeline with a VERY BRIEF title (3-5 words) and precise year range
+3. At least 3 detailed stories within that timeline (each should be substantial, 5-7 paragraphs) with VERY BRIEF titles (3-5 words)
 4. Quiz questions for each story (with 4 options per question)
 
-Focus on historically accurate information about underrepresented groups. The content should be college-level depth and detail while remaining engaging."""
+Focus on historically accurate information about underrepresented groups. The content should be college-level depth and detail while remaining engaging.
+
+IMPORTANT: All titles and persona descriptions MUST be extremely concise (max 5-7 words)."""
     )
     
     # Run the assistant
@@ -321,12 +341,12 @@ def process_content(content):
         content=f"""Please structure the following content into a JSON format with these keys:
         
         1. character: {{
-            "persona": "Detailed description of the historical figure",
+            "persona": "BRIEF description of the historical figure (max 5-7 words)",
             "avatar_description": "Description for generating an image of this character"
         }}
         
         2. timeline: {{
-            "title": "Title of the timeline",
+            "title": "BRIEF title of the timeline (max 3-5 words)",
             "year_range": "YYYY-YYYY",
             "overview": "Comprehensive overview of the timeline",
             "description": "Visual description for generating an image representing this timeline"
@@ -334,7 +354,7 @@ def process_content(content):
         
         3. stories: [
             {{
-                "title": "Story title",
+                "title": "BRIEF story title (max 3-5 words)",
                 "desc": "Detailed story description (keep all paragraphs)",
                 "story_date": "YYYY-MM-DD",
                 "story_type": 1-12 (use the number),
@@ -379,6 +399,7 @@ def process_content(content):
         2. Each story MUST have a corresponding quiz in the quizzes array
         3. Preserve all paragraph breaks and formatting in the descriptions
         4. Add an appropriate image description for each element
+        5. KEEP ALL TITLES AND PERSONA DESCRIPTIONS EXTREMELY BRIEF (3-5 words)
         """
     )
     
@@ -450,6 +471,9 @@ def process_content(content):
                                 options = options[:4]
                             question["options"] = options
                 
+                # Apply validation for title/persona brevity
+                structured_data = validate_structured_data(structured_data)
+                
                 return structured_data
             except Exception as e:
                 print(f"Error parsing JSON: {e}")
@@ -457,6 +481,40 @@ def process_content(content):
                 return None
     
     return None
+
+def validate_structured_data(structured_data):
+    """Validates that titles and personas are appropriately brief"""
+    modified = False
+    
+    # Check and trim character persona
+    if "character" in structured_data and "persona" in structured_data["character"]:
+        persona = structured_data["character"]["persona"]
+        words = persona.split()
+        if len(words) > 7:
+            structured_data["character"]["persona"] = " ".join(words[:7])
+            modified = True
+    
+    # Check and trim timeline title
+    if "timeline" in structured_data and "title" in structured_data["timeline"]:
+        title = structured_data["timeline"]["title"]
+        words = title.split()
+        if len(words) > 5:
+            structured_data["timeline"]["title"] = " ".join(words[:5])
+            modified = True
+    
+    # Check and trim story titles
+    if "stories" in structured_data:
+        for story in structured_data["stories"]:
+            if "title" in story:
+                title = story["title"]
+                words = title.split()
+                if len(words) > 5:
+                    story["title"] = " ".join(words[:5])
+                    modified = True
+    
+    if modified:
+        print("Some titles were trimmed to ensure brevity.")
+    return structured_data
 
 def main():
     """Main function to run the content generation workflow"""
@@ -488,7 +546,7 @@ def main():
             client.beta.threads.messages.create(
                 thread_id=thread.id,
                 role="user",
-                content=f"Please refine the content based on this feedback: {refinement}"
+                content=f"Please refine the content based on this feedback: {refinement}. Remember to keep all titles and persona descriptions EXTREMELY BRIEF (max 5-7 words)."
             )
             
             assistant = create_assistant()
