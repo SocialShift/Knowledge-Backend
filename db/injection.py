@@ -245,6 +245,7 @@ def create_quiz(story_id, questions):
         })
     
     quiz_data = {
+        "story_id": story_id,  # Add the story_id to the request body
         "questions": validated_questions
     }
     
