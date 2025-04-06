@@ -4,10 +4,13 @@ from datetime import datetime
 from passlib.context import CryptContext
 import random
 import enum
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
-DATABASE_URL = "postgresql://knowledge_m6op_user:iWuFJIfgxlLCoJz5Ot0NlJP6230WkUNu@dpg-cvl8ad56ubrc73bggt1g-a.oregon-postgres.render.com/knowledge_m6op"
+DATABASE_URL= os.environ['DATABASE_URL']
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -125,6 +128,9 @@ class User(Base):
     def set_password(self, password):
         self.password= pwd_context.hash(password)
 
+    
+    def __repr__(self):
+        return self.email
 # Profile Model
 class Profile(Base):
     __tablename__= 'profiles'
@@ -162,6 +168,9 @@ class Profile(Base):
     @staticmethod
     def create_random():
         return "".join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    def __repr__(self):
+        return self.nickname
 
 class OnThisDay(Base):
     __tablename__ = "on_this_day"
@@ -177,6 +186,8 @@ class OnThisDay(Base):
     # Relationship
     story = relationship("Story", back_populates="on_this_day")  # Connects to Story
 
+    def __repr__(self):
+        return self.title
 
 class Character(Base):
     __tablename__= "characters"
@@ -185,6 +196,9 @@ class Character(Base):
     avatar_url= Column(String(255), unique=True, nullable=True)
     persona= Column(Text, nullable=False)
     created_at= Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return self.persona
     
 
 class Timeline(Base):
@@ -201,6 +215,9 @@ class Timeline(Base):
     # Relationship with Stories
     stories = relationship("Story", back_populates="timeline", cascade="all, delete-orphan")
     main_character = relationship("Character")
+
+    def __repr__(self):
+        return self.title
 
 class Timestamp(Base):
     __tablename__ = "timestamps"
@@ -233,6 +250,8 @@ class Story(Base):
     timestamps = relationship("Timestamp", back_populates="story", cascade="all, delete-orphan")
     quiz = relationship("Quiz", back_populates="story", uselist=False, cascade="all, delete-orphan")
 
+    def __repr__(self):
+        return self.title
 
 
 class Quiz(Base):

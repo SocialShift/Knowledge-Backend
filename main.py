@@ -36,6 +36,38 @@ Base.metadata.create_all(bind=engine)
 app.include_router(users.router)
 app.include_router(stories_timelines.router)
 
+# Include admin
+from sqladmin import Admin
+admin = Admin(app, engine)
+
+# Register admin views
+from db.admin import (
+    UserAdmin, 
+    ProfileAdmin, 
+    TimelineAdmin, 
+    StoryAdmin, 
+    QuizAdmin,
+    QuestionAdmin,
+    OptionAdmin,
+    CharacterAdmin, 
+    OnThisDayAdmin,
+    QuizAttemptAdmin,
+    UserStoryLikeAdmin,
+    TimestampAdmin
+)
+
+admin.add_view(UserAdmin)
+admin.add_view(ProfileAdmin)
+admin.add_view(TimelineAdmin)
+admin.add_view(StoryAdmin)
+admin.add_view(QuizAdmin)
+admin.add_view(QuestionAdmin)
+admin.add_view(OptionAdmin)
+admin.add_view(CharacterAdmin)
+admin.add_view(OnThisDayAdmin)
+admin.add_view(QuizAttemptAdmin)
+admin.add_view(UserStoryLikeAdmin)
+admin.add_view(TimestampAdmin)
 
 if __name__== "__main__":
     import uvicorn
