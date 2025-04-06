@@ -195,7 +195,7 @@ def create_timeline(title, year_range, overview, main_character_id, timeline_des
     print(f"Timeline created: {response}")
     return response, thumbnail_file_path
 
-def create_story(timeline_id, title, desc, story_date, story_type, story_description, timestamps=None):
+def create_story(timeline_id, title, desc, story_date, story_type, story_description, timestamps=None, generate_video=True):
     """Create a story within a timeline with generated media"""
     url = f"{BASE_URL}/{timeline_id}/story/create"
     
@@ -206,6 +206,12 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
         print("Story title trimmed to ensure brevity.")
     
     if timestamps is None:
+        timestamps = []
+    
+    # Adjust timestamps if not generating video
+    if not generate_video:
+        print("Not generating video, using empty timestamps")
+        # Skip timestamps when not generating video
         timestamps = []
     
     # Handle BCE/BC dates by converting to a standard format
@@ -231,29 +237,39 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
             print(f"Error converting BCE/BC date: {e}")
             story_date = "0001-01-01"  # Default to year 1 CE/AD
     
-    # Create video content instead of just an image
-    print(f"Generating video for story: {title}")
-    # Use our new video generator to create a complete video
-    video_dir = "generated_media/videos"
-    os.makedirs(video_dir, exist_ok=True)
+    # Generate media for the story
+    thumbnail_file_path = None
+    video_file_path = None
     
-    try:
-        # Generate video and associated content
-        video_result = create_video(client, story_description, video_dir)
-        video_file_path = video_result["video_path"]
+    if generate_video:
+        # Create video content instead of just an image
+        print(f"Generating video for story: {title}")
+        # Use our new video generator to create a complete video
+        video_dir = "generated_media/videos"
+        os.makedirs(video_dir, exist_ok=True)
         
-        # Get the first image to use as thumbnail
-        story_dir = Path(video_result["story_dir"])
-        thumbnail_file_path = list(story_dir.glob("image-1.png"))[0]
-        
-        if not os.path.exists(thumbnail_file_path):
-            # Fallback to generating an image if needed
+        try:
+            # Generate video and associated content
+            video_result = create_video(client, story_description, video_dir)
+            video_file_path = video_result["video_path"]
+            
+            # Get the first image to use as thumbnail
+            story_dir = Path(video_result["story_dir"])
+            thumbnail_file_path = list(story_dir.glob("image-1.png"))[0]
+            
+            if not os.path.exists(thumbnail_file_path):
+                # Fallback to generating an image if needed
+                thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
+        except Exception as e:
+            print(f"Error creating video: {e}")
+            # Fallback to just generating image
             thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
-    except Exception as e:
-        print(f"Error creating video: {e}")
-        # Fallback to just generating image
+            video_file_path = thumbnail_file_path
+    else:
+        # Just generate an image
+        print(f"Generating image for story: {title}")
         thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
-        video_file_path = thumbnail_file_path
+        video_file_path = thumbnail_file_path  # Use the same image for video placeholder
     
     form_data = {
         "title": title,
@@ -336,6 +352,8 @@ Please provide extensive, richly detailed ideas for:
 2. A timeline with a VERY BRIEF title (3-5 words) and precise year range
 3. At least 3 detailed stories within that timeline (each should be substantial, 5-7 paragraphs) with VERY BRIEF titles (3-5 words)
 4. Quiz questions for each story (with 4 options per question)
+
+Each story should include a detailed visual description that can be used to generate either an image or a short video.
 
 Focus on historically accurate information about underrepresented groups. The content should be college-level depth and detail while remaining engaging.
 
@@ -597,6 +615,13 @@ def main():
             print("Please enter a valid topic.")
             continue
         
+        # Ask user if they want to generate videos
+        generate_videos = input("Would you like to generate videos for the stories? (yes/no): ").lower() == "yes"
+        if generate_videos:
+            print("Videos will be generated for each story.")
+        else:
+            print("Only images will be generated for the stories (no videos).")
+        
         print("\nGenerating content ideas based on your topic...")
         content = generate_content(user_query, thread)
         
@@ -706,7 +731,8 @@ def main():
                         story_data.get("story_date", datetime.now().strftime("%Y-%m-%d")),
                         story_data.get("story_type", 7),  # Default to EDUCATIONAL
                         story_data["description"],
-                        story_data.get("timestamps", [])
+                        story_data.get("timestamps", []),
+                        generate_video=generate_videos  # Pass the video generation flag
                     )
                     created_files.append(story_image)
                     
