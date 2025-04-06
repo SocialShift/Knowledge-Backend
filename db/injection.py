@@ -14,6 +14,8 @@ from datetime import datetime, date
 import uuid
 import base64
 from io import BytesIO
+from pathlib import Path
+from video_generator import create_video
 
 load_dotenv()
 
@@ -206,12 +208,52 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
     if timestamps is None:
         timestamps = []
     
-    # Generate story images
-    print(f"Generating image for story: {title}")
-    thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
+    # Handle BCE/BC dates by converting to a standard format
+    if isinstance(story_date, str) and ('BCE' in story_date.upper() or 'BC' in story_date.upper()):
+        print(f"Converting BCE/BC date: {story_date}")
+        # Extract year and convert BCE/BC to CE/AD format (use a placeholder date)
+        try:
+            # Check if it's a range
+            if '-' in story_date:
+                # Just use the later date in the range
+                parts = story_date.split('-')
+                year_part = parts[-1].strip()
+            else:
+                year_part = story_date
+                
+            # Remove BCE/BC and extract the year
+            year_part = year_part.upper().replace('BCE', '').replace('BC', '').strip()
+            
+            # Use January 1st of the year as a standard date
+            story_date = f"0001-01-01"  # Default to year 1 CE/AD
+            print(f"Converted date to standard format: {story_date}")
+        except Exception as e:
+            print(f"Error converting BCE/BC date: {e}")
+            story_date = "0001-01-01"  # Default to year 1 CE/AD
     
-    # Use the same image for video for now
-    video_file_path = thumbnail_file_path
+    # Create video content instead of just an image
+    print(f"Generating video for story: {title}")
+    # Use our new video generator to create a complete video
+    video_dir = "generated_media/videos"
+    os.makedirs(video_dir, exist_ok=True)
+    
+    try:
+        # Generate video and associated content
+        video_result = create_video(client, story_description, video_dir)
+        video_file_path = video_result["video_path"]
+        
+        # Get the first image to use as thumbnail
+        story_dir = Path(video_result["story_dir"])
+        thumbnail_file_path = list(story_dir.glob("image-1.png"))[0]
+        
+        if not os.path.exists(thumbnail_file_path):
+            # Fallback to generating an image if needed
+            thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
+    except Exception as e:
+        print(f"Error creating video: {e}")
+        # Fallback to just generating image
+        thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
+        video_file_path = thumbnail_file_path
     
     form_data = {
         "title": title,
@@ -219,13 +261,13 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
         "story_date": story_date,
         "story_type": story_type,
         "timestamps_json": json.dumps(timestamps),
-        "thumbnail_file": thumbnail_file_path,
-        "video_file": video_file_path
+        "thumbnail_file": str(thumbnail_file_path),
+        "video_file": str(video_file_path)
     }
     
     response = upload_media(url, form_data)
     print(f"Story created: {response}")
-    return response, thumbnail_file_path
+    return response, video_file_path
 
 def create_quiz(story_id, questions):
     """Create a quiz for a story"""
@@ -400,6 +442,9 @@ def process_content(content):
         3. Preserve all paragraph breaks and formatting in the descriptions
         4. Add an appropriate image description for each element
         5. KEEP ALL TITLES AND PERSONA DESCRIPTIONS EXTREMELY BRIEF (3-5 words)
+        6. For story_date, use EXACTLY the format YYYY-MM-DD (example: 1963-08-28)
+           - For ancient/BCE dates, use 0001-01-01 as a placeholder
+           - For date ranges or uncertain dates, pick a specific representative date
         """
     )
     
@@ -511,9 +556,30 @@ def validate_structured_data(structured_data):
                 if len(words) > 5:
                     story["title"] = " ".join(words[:5])
                     modified = True
+            
+            # Ensure story_date is in a valid format
+            if "story_date" in story:
+                # Check for BCE/BC dates and provide a fallback
+                if isinstance(story["story_date"], str) and ('BCE' in story["story_date"].upper() or 'BC' in story["story_date"].upper()):
+                    print(f"Converting BCE/BC date in structured data: {story['story_date']}")
+                    # Default to a standard date format
+                    story["story_date"] = "0001-01-01"
+                    modified = True
+                
+                # Ensure it follows YYYY-MM-DD format
+                try:
+                    # Try to parse the date
+                    parsed_date = datetime.strptime(story["story_date"], "%Y-%m-%d")
+                    # Reformat to ensure consistency
+                    story["story_date"] = parsed_date.strftime("%Y-%m-%d")
+                except ValueError:
+                    # If parsing fails, default to a safe date
+                    print(f"Invalid date format in structured data: {story['story_date']}")
+                    story["story_date"] = "0001-01-01"
+                    modified = True
     
     if modified:
-        print("Some titles were trimmed to ensure brevity.")
+        print("Some content was modified to ensure compatibility with the API.")
     return structured_data
 
 def main():
