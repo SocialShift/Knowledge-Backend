@@ -23,7 +23,7 @@ load_dotenv()
 client = OpenAI()
 
 # Authentication cookie (replace with your actual cookie)
-AUTH_COOKIE = "eyJ1c2VyX2lkIjogMSwgImVtYWlsIjogImFAYS5jb20ifQ==.Z-WePQ.cI46wbz5zaeNfsAniR2ih7m25rs"
+AUTH_COOKIE = "eyJ1c2VyX2lkIjogOCwgImVtYWlsIjogIm5qbmF5YW4yMjJAZ21haWwuY29tIn0=.Z_qPEA.6TzWm-nPCJR4Ug3HD-xskn9KnK8"
 BASE_URL = "https://knowledge-backend-rqya.onrender.com/api"
 
 # Thread management

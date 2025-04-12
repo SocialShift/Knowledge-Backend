@@ -121,6 +121,11 @@ class User(Base):
 
     # Relationship with Profile
     profile= relationship("Profile", uselist=False, back_populates="user", cascade="all, delete-orphan")
+    
+    # Community relationships
+    communities = relationship("Community", back_populates="creator")
+    posts = relationship("Post", back_populates="author")
+    comments = relationship("Comment", back_populates="author")
 
     def verify_password(self, plain_password):
         return pwd_context.verify(plain_password, self.password)
@@ -313,3 +318,63 @@ class UserStoryLike(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'story_id', name='unique_user_story_like'),
     )
+
+class Community(Base):
+    __tablename__= "communities"
+
+    id= Column(Integer, primary_key=True)
+    name= Column(String(200), nullable=False)
+    description= Column(Text)
+    banner_url= Column(String(255), default='media/community-banners/default.jpeg')
+    icon_url= Column(String(255), default='media/community-icons/default.jpeg')
+    topics= Column(JSON, nullable=True) # select multiples
+    
+    created_at= Column(DateTime, default=datetime.utcnow)
+    created_by= Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
+
+    creator= relationship("User", back_populates="communities")
+    posts = relationship("Post", back_populates="community", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return self.name
+
+class Post(Base):
+    __tablename__= "posts"
+
+    id= Column(Integer, primary_key=True)
+    community_id= Column(Integer, ForeignKey('communities.id', ondelete='CASCADE'))
+    title= Column(String(255), nullable=False)
+    body= Column(Text, nullable=True)
+    image_url= Column(String(255), nullable=True)
+
+    upvote= Column(Integer, default=0)
+    downvote= Column(Integer, default=0)
+
+    created_at= Column(DateTime, default=datetime.utcnow)
+    created_by= Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
+
+    author= relationship("User", back_populates="posts")
+    community = relationship("Community", back_populates="posts")
+    comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return self.title
+
+
+class Comment(Base):
+    __tablename__= "comments"
+
+
+    id= Column(Integer, primary_key=True)
+    post_id= Column(Integer, ForeignKey('posts.id', ondelete="CASCADE"))
+    commented_by= Column(Integer, ForeignKey('users.id', ondelete="CASCADE"))
+    comment= Column(Text)
+    upvote= Column(Integer, default=0)
+    downvote= Column(Integer, default=0)
+    created_at= Column(DateTime, default=datetime.utcnow)
+
+    author= relationship("User", back_populates="comments")
+    post = relationship("Post", back_populates="comments")
+
+    def __repr__(self):
+        return f"Comment by {self.commented_by} on post {self.post_id}"

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import users, stories_timelines
+from routers import users, stories_timelines, communities_posts
 from db.models import engine, Base
 from utils.auth import SECRET_KEY
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +35,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(users.router)
 app.include_router(stories_timelines.router)
+app.include_router(communities_posts.router)
 
 # Include admin
 from sqladmin import Admin
