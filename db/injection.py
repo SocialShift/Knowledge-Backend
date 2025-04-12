@@ -208,12 +208,6 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
     if timestamps is None:
         timestamps = []
     
-    # Adjust timestamps if not generating video
-    if not generate_video:
-        print("Not generating video, using empty timestamps")
-        # Skip timestamps when not generating video
-        timestamps = []
-    
     # Handle BCE/BC dates by converting to a standard format
     if isinstance(story_date, str) and ('BCE' in story_date.upper() or 'BC' in story_date.upper()):
         print(f"Converting BCE/BC date: {story_date}")
@@ -260,6 +254,10 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
             if not os.path.exists(thumbnail_file_path):
                 # Fallback to generating an image if needed
                 thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
+            
+            # Generate dynamic timestamps based on video content
+            if not timestamps:  # Only generate if timestamps are not already provided
+                timestamps = generate_timestamps_from_video(video_result)
         except Exception as e:
             print(f"Error creating video: {e}")
             # Fallback to just generating image
@@ -270,6 +268,8 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
         print(f"Generating image for story: {title}")
         thumbnail_file_path = generate_image(f"Historical scene depicting {story_description}")
         video_file_path = thumbnail_file_path  # Use the same image for video placeholder
+        # No timestamps for image-only
+        timestamps = []
     
     form_data = {
         "title": title,
@@ -284,6 +284,108 @@ def create_story(timeline_id, title, desc, story_date, story_type, story_descrip
     response = upload_media(url, form_data)
     print(f"Story created: {response}")
     return response, video_file_path
+
+def generate_timestamps_from_video(video_result):
+    """Generate meaningful timestamps based on the video content"""
+    timestamps = []
+    
+    try:
+        # Get story data from the video result
+        story = video_result.get("story")
+        if not story:
+            return default_timestamps()
+        
+        # Get steps from the story
+        steps = []
+        try:
+            steps = story.steps  # Try accessing steps directly (if story is StoryResponse object)
+        except AttributeError:
+            # If story is a dict, not an object
+            if isinstance(story, dict) and "steps" in story:
+                steps = story["steps"]
+        
+        if not steps:
+            return default_timestamps()
+        
+        # Calculate audio durations and timestamps
+        durations_ms = []
+        cumulative_time = 0
+        
+        # Calculate audio durations
+        for i, step in enumerate(steps):
+            try:
+                # Get step ID (handle both object and dict formats)
+                if isinstance(step, dict):
+                    step_id = step.get("number_id", str(i+1))
+                else:
+                    step_id = getattr(step, "number_id", str(i+1))
+                
+                # Try to get actual audio file duration
+                from pydub import AudioSegment
+                audio_path = Path(video_result["story_dir"]) / f"step-{step_id}.mp3"
+                if audio_path.exists():
+                    audio = AudioSegment.from_file(str(audio_path))
+                    duration_ms = len(audio)
+                else:
+                    # Default duration if audio file doesn't exist
+                    duration_ms = 3000  # 3 seconds
+                
+                durations_ms.append(duration_ms)
+                
+                # Create a timestamp at the start of each segment
+                # Ensure time_sec is at least 1 (not 0)
+                time_sec = max(1, int(cumulative_time / 1000))
+                
+                # Get step text (handle both object and dict formats)
+                if isinstance(step, dict):
+                    step_text = step.get("text", f"Part {i+1}")
+                else:
+                    step_text = getattr(step, "text", f"Part {i+1}")
+                
+                # Get a descriptive label from the step content
+                if i == 0:
+                    label = "Introduction"
+                elif i == len(steps) - 1:
+                    label = "Conclusion"
+                else:
+                    # Extract a short phrase from the beginning of the step text
+                    words = step_text.split()
+                    label_words = words[:3] if len(words) > 3 else words
+                    label = " ".join(label_words) + "..."
+                
+                timestamps.append({
+                    "time_sec": time_sec,
+                    "label": label
+                })
+                
+                cumulative_time += duration_ms
+                
+            except Exception as e:
+                print(f"Error calculating timestamp for step {i}: {e}")
+                continue
+        
+        # Add a final timestamp if not already at the end
+        if cumulative_time > 0:
+            total_seconds = max(1, int(cumulative_time / 1000))
+            if not any(ts["time_sec"] == total_seconds for ts in timestamps):
+                timestamps.append({
+                    "time_sec": total_seconds,
+                    "label": "End"
+                })
+        
+        return timestamps if timestamps else default_timestamps()
+    
+    except Exception as e:
+        print(f"Error generating timestamps: {e}")
+        return default_timestamps()
+
+def default_timestamps():
+    """Return default timestamps if dynamic generation fails"""
+    return [
+        {"time_sec": 1, "label": "Introduction"},
+        {"time_sec": 30, "label": "Main Content"},
+        {"time_sec": 60, "label": "Conclusion"}
+    ]
 
 def create_quiz(story_id, questions):
     """Create a quiz for a story"""
@@ -418,13 +520,7 @@ def process_content(content):
                 "desc": "Detailed story description (keep all paragraphs)",
                 "story_date": "YYYY-MM-DD",
                 "story_type": 1-12 (use the number),
-                "description": "Visual description for generating an image representing this story",
-                "timestamps": [
-                    {{"time_sec": 30, "label": "Introduction"}},
-                    {{"time_sec": 60, "label": "Event starts"}},
-                    {{"time_sec": 120, "label": "Key moment"}},
-                    {{"time_sec": 180, "label": "Conclusion"}}
-                ]
+                "description": "Visual description for generating an image representing this story"
             }}
         ]
         
