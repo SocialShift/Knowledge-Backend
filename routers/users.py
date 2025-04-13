@@ -110,7 +110,7 @@ async def update_profile(
     language_preference: str = Form(None),
     pronouns: str = Form(None),
     location: str = Form(None),
-    personalization_questions_json: str = Form(None),
+    personalization_questions: str = Form(None),
     avatar_file: UploadFile = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -131,9 +131,9 @@ async def update_profile(
         update_data["location"] = location
     
     # Parse personalization questions if provided
-    if personalization_questions_json is not None:
+    if personalization_questions is not None:
         try:
-            update_data["personalization_questions"] = json.loads(personalization_questions_json)
+            update_data["personalization_questions"] = json.loads(personalization_questions)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid personalization questions JSON format")
     
