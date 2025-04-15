@@ -4,7 +4,7 @@
 # /api/story/{story_id}/quiz/create
 
 
-from openai import OpenAI
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 import os
 import requests
@@ -20,7 +20,7 @@ from video_generator import create_video
 load_dotenv()
 
 # Initialize OpenAI client
-client = OpenAI()
+client = AzureOpenAI(api_version="2024-12-01-preview",api_key= os.environ['OPENAI_API_KEY'], azure_endpoint="https://beta101.openai.azure.com/")
 
 # Authentication cookie (replace with your actual cookie)
 AUTH_COOKIE = "eyJ1c2VyX2lkIjogOCwgImVtYWlsIjogIm5qbmF5YW4yMjJAZ21haWwuY29tIn0=.Z_qPEA.6TzWm-nPCJR4Ug3HD-xskn9KnK8"
