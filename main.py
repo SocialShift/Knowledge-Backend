@@ -54,7 +54,8 @@ from db.admin import (
     OnThisDayAdmin,
     QuizAttemptAdmin,
     UserStoryLikeAdmin,
-    TimestampAdmin
+    TimestampAdmin,
+    FeedbackAdmin
 )
 
 admin.add_view(UserAdmin)
@@ -69,6 +70,7 @@ admin.add_view(OnThisDayAdmin)
 admin.add_view(QuizAttemptAdmin)
 admin.add_view(UserStoryLikeAdmin)
 admin.add_view(TimestampAdmin)
+admin.add_view(FeedbackAdmin)
 
 if __name__== "__main__":
     import uvicorn
