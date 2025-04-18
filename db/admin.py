@@ -1,5 +1,5 @@
 from sqladmin import ModelView
-from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp
+from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback
 
 class UserAdmin(ModelView, model=User):
     column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin]
@@ -146,4 +146,15 @@ class TimestampAdmin(ModelView, model=Timestamp):
     # Display related story
     column_formatters = {
         Timestamp.story: lambda m, a: f"{m.story.title}" if m.story else "None"
+    }
+
+class FeedbackAdmin(ModelView, model=Feedback):
+    column_list = [Feedback.id, Feedback.user_id, Feedback.text]
+    name = "Feedback"
+    name_plural = "Feedbacks"
+    icon = "fa-solid fa-comment"
+    
+    # Display related user
+    column_formatters = {
+        Feedback.user: lambda m, a: f"{m.user.email}" if m.user else "None"
     }
