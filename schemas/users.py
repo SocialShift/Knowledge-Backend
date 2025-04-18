@@ -65,3 +65,8 @@ class LeaderboardEntryModel(BaseModel):
 class LeaderboardResponseModel(BaseModel):
     leaderboard: List[LeaderboardEntryModel]
     user_rank: int = None
+
+
+
+class FeedbackCreateModel(BaseModel):
+    text: str 

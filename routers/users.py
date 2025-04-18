@@ -3,11 +3,12 @@ from db.models import get_db, User, Profile, QuizAttempt
 from sqlalchemy.orm import Session
 from schemas.users import UserCreateModel, LoginModel, ProfileUpdate, UserEmailUpdate, UserPasswordChange
 from fastapi.responses import JSONResponse
-from db.models import pwd_context
+from db.models import pwd_context, Feedback
 from utils.auth import get_current_user, create_session, end_session
 from utils.file_handler import save_image, delete_file
 import json
 from datetime import datetime, date, timedelta
+from schemas.users import FeedbackCreateModel
 
 router = APIRouter(prefix="/api/auth")
 
@@ -408,3 +409,27 @@ async def get_notifications(
         "notifications": notifications,
         "unread_count": len(notifications)
     }
+
+
+
+
+
+@router.post('/create-feedback')
+async def create_feedback(
+    data: FeedbackCreateModel,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    new_feedback= Feedback(
+        text= data.text,
+        user_id= current_user.id
+    )
+    db.add(new_feedback)
+    try:
+        db.commit()
+        db.refresh(new_feedback)
+        return JSONResponse({'detail': "Feedback Created"}, status_code=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))

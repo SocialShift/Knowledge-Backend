@@ -126,6 +126,9 @@ class User(Base):
     communities = relationship("Community", back_populates="creator")
     posts = relationship("Post", back_populates="author")
     comments = relationship("Comment", back_populates="author")
+    
+    # Feedback relationship
+    feedback = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
 
     def verify_password(self, plain_password):
         return pwd_context.verify(plain_password, self.password)
@@ -378,3 +381,15 @@ class Comment(Base):
 
     def __repr__(self):
         return f"Comment by {self.commented_by} on post {self.post_id}"
+    
+class Feedback(Base):
+    __tablename__= "feedbacks"
+
+    id= Column(Integer, primary_key=True)
+    user_id= Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), unique=False, nullable=False)
+    text= Column(Text, nullable=False)
+
+    user= relationship("User", back_populates="feedback")
+
+    def __repr__(self):
+        return f"Feedback by {self.user_id}"
