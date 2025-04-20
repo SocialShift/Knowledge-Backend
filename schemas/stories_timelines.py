@@ -3,7 +3,7 @@ from datetime import datetime, date
 from typing import Optional, List
 from fastapi import UploadFile, File
 from pydantic import field_validator
-from db.models import StoryType
+from db.models import StoryType, TimelineCategory
 
 class OnThisDayCreateModel(BaseModel):
     date: date
@@ -32,6 +32,7 @@ class TimelineCreateModel(BaseModel):
     year_range: str
     overview: str
     main_character_id: Optional[int] = None
+    categories: Optional[List[str]] = None
 
     @field_validator('title')
     def title_must_not_be_empty(cls, v):
@@ -43,10 +44,11 @@ class TimelineCreateModel(BaseModel):
         arbitrary_types_allowed = True
 
 class TimelineUpdateModel(BaseModel):
-    title: str = None
-    year_range: str = None
-    overview: str = None
+    title: Optional[str] = None
+    year_range: Optional[str] = None
+    overview: Optional[str] = None
     main_character_id: Optional[int] = None
+    categories: Optional[List[str]] = None  # List of category tags
 
 class TimeStampCreateModel(BaseModel):
     time_sec: int = Field(..., gt=0, description="Timestamp in seconds")  # Must be greater than 0
@@ -161,13 +163,13 @@ class QuizAttemptResponseModel(BaseModel):
 
 class CharacterCreateModel(BaseModel):
     persona: str
-    avatar_file: UploadFile = None
+    avatar_file: Optional[UploadFile] = None
     
     class Config:
         arbitrary_types_allowed = True
 
 class CharacterUpdateModel(BaseModel):
-    persona: str = None
+    persona: Optional[str] = None
     
     class Config:
         arbitrary_types_allowed = True

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Query
 from schemas.stories_timelines import (
     TimelineCreateModel, StoryCreateModel, OnThisDayCreateModel, OnThisDayResponseModel, 
     TimelineUpdateModel, StoryUpdateModel, TimeStampCreateModel, QuizCreateModel, 
@@ -182,17 +182,27 @@ async def create_timeline(
     year_range: str = Form(...),
     overview: str = Form(...),
     main_character_id: Optional[int] = Form(None),
+    categories_json: str= Form("[]"),
     thumbnail_file: UploadFile = File(...),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
     # Validate with Pydantic
     try:
+        # Parse categories from JSON if provided
+        categories = None
+        if categories_json:
+            try:
+                categories = json.loads(categories_json)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid categories JSON format")
+        
         validated_data = TimelineCreateModel(
             title=title,
             year_range=year_range,
             overview=overview,
-            main_character_id=main_character_id
+            main_character_id=main_character_id,
+            categories=categories
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
@@ -206,7 +216,8 @@ async def create_timeline(
         thumbnail_url = thumbnail_url,
         year_range = validated_data.year_range,
         overview = validated_data.overview,
-        main_character_id = validated_data.main_character_id
+        main_character_id = validated_data.main_character_id,
+        categories = validated_data.categories
     )
     
     db.add(new_timeline)
@@ -247,15 +258,99 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
         "overview": timeline_obj.overview,
         "thumbnail_url": timeline_obj.thumbnail_url,
         "created_at": timeline_obj.created_at,
-        "main_character": main_character
+        "main_character": main_character,
+        "categories": timeline_obj.categories
     }
     
     return response
 
 @router.get('/list/timelines')
 async def get_timelines(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    timelines= db.query(Timeline).all()
-    return timelines
+    timelines = db.query(Timeline).all()
+    
+    # Convert each timeline to a dictionary with categories included
+    result = []
+    for timeline in timelines:
+        # Get main character info if exists
+        main_character = None
+        if timeline.main_character_id:
+            character = db.query(Character).filter(Character.id == timeline.main_character_id).first()
+            if character:
+                main_character = {
+                    "id": character.id,
+                    "avatar_url": character.avatar_url,
+                    "persona": character.persona,
+                    "created_at": character.created_at
+                }
+        
+        # Create response with timeline and main character
+        timeline_dict = {
+            "id": timeline.id,
+            "title": timeline.title,
+            "year_range": timeline.year_range,
+            "overview": timeline.overview,
+            "thumbnail_url": timeline.thumbnail_url,
+            "created_at": timeline.created_at,
+            "main_character": main_character,
+            "categories": timeline.categories
+        }
+        result.append(timeline_dict)
+    
+    return result
+
+@router.get('/timelines/filter')
+async def filter_timelines(
+    categories: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Filter timelines by categories"""
+    query = db.query(Timeline)
+    
+    if categories:
+        # Filter timelines that have at least one matching category
+        # This is a more complex query since we need to filter based on JSON array contents
+        filtered_timelines = []
+        all_timelines = query.all()
+        
+        for timeline in all_timelines:
+            if timeline.categories:
+                # Check if any specified category is in the timeline's categories
+                if any(category in timeline.categories for category in categories):
+                    filtered_timelines.append(timeline)
+    else:
+        # If no categories specified, return all timelines
+        filtered_timelines = query.all()
+    
+    # Convert timelines to response format with categories included
+    result = []
+    for timeline in filtered_timelines:
+        # Get main character info if exists
+        main_character = None
+        if timeline.main_character_id:
+            character = db.query(Character).filter(Character.id == timeline.main_character_id).first()
+            if character:
+                main_character = {
+                    "id": character.id,
+                    "avatar_url": character.avatar_url,
+                    "persona": character.persona,
+                    "created_at": character.created_at
+                }
+        
+        # Create response with timeline and main character
+        timeline_dict = {
+            "id": timeline.id,
+            "title": timeline.title,
+            "year_range": timeline.year_range,
+            "overview": timeline.overview,
+            "thumbnail_url": timeline.thumbnail_url,
+            "created_at": timeline.created_at,
+            "main_character": main_character,
+            "categories": timeline.categories
+        }
+        result.append(timeline_dict)
+    
+    return result
 
 @router.patch('/timeline/update/{timeline_id}')
 async def update_timeline(
@@ -264,6 +359,7 @@ async def update_timeline(
     year_range: Optional[str] = Form(None),
     overview: Optional[str] = Form(None),
     main_character_id: Optional[int] = Form(None),
+    categories_json: Optional[str] = Form("[]"),
     thumbnail_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -287,6 +383,13 @@ async def update_timeline(
         update_data["overview"] = overview
     if main_character_id is not None:
         update_data["main_character_id"] = main_character_id
+    
+    # Parse categories from JSON if provided
+    if categories_json is not None:
+        try:
+            update_data["categories"] = json.loads(categories_json)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid categories JSON format")
     
     # Validate with Pydantic if there's data to update
     if update_data:

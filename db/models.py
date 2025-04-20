@@ -55,6 +55,49 @@ class StoryType(enum.IntEnum):
     SOCIAL_MOVEMENT = 11
     ARTISTIC_DEVELOPMENT = 12
 
+class TimelineCategory(str, enum.Enum):
+    # Racial/Ethnic Categories
+    AFRICAN = "African/African Diaspora"
+    ASIAN = "Asian/Asian Diaspora"
+    INDIGENOUS = "Indigenous/Native"
+    LATINO = "Latino/Hispanic"
+    MIDDLE_EASTERN = "Middle Eastern/North African"
+    PACIFIC_ISLANDER = "Pacific Islander"
+    WHITE = "White/European"
+    MULTIRACIAL = "Multiracial/Mixed Heritage"
+    RACIAL_OTHER = "Other"
+    RACIAL_NO_ANSWER = "Prefer not to say"
+    
+    # Gender Categories
+    WOMAN = "Woman"
+    MAN = "Man"
+    NON_BINARY = "Non-Binary"
+    GENDERQUEER = "Genderqueer/Gender Non-Conforming"
+    TRANSGENDER = "Transgender"
+    TWO_SPIRIT = "Two-Spirit (Indigenous-specific identity)"
+    GENDER_OTHER = "Other"
+    GENDER_NO_ANSWER = "Prefer not to say"
+    
+    # Sexual Orientation Categories
+    STRAIGHT = "Heterosexual/Straight"
+    GAY = "Gay/Lesbian"
+    BISEXUAL = "Bisexual/Pansexual"
+    ASEXUAL = "Asexual"
+    QUEER = "Queer"
+    SEXUAL_OTHER = "Other"
+    SEXUAL_NO_ANSWER = "Prefer not to say"
+    
+    # Historical Focus Categories
+    INDIGENOUS_HISTORY = "Indigenous Histories and Cultures"
+    BLACK_HISTORY = "African Diaspora and Black History"
+    LGBTQ_HISTORY = "LGBTQ+ Movements and Milestones"
+    WOMEN_HISTORY = "Women's Histories and Contributions"
+    IMMIGRANT_HISTORY = "Immigrant and Refugee Stories"
+    COLONIAL_HISTORY = "Colonialism and Post-Colonial Histories"
+    CIVIL_RIGHTS = "Civil Rights and Social Justice Movements"
+    LESSER_KNOWN = "Lesser-Known Historical Figures"
+    HISTORY_OTHER = "Other"
+
 class Location(str, enum.Enum):
     ALABAMA = "Alabama"
     ALASKA = "Alaska"
@@ -123,9 +166,9 @@ class User(Base):
     profile= relationship("Profile", uselist=False, back_populates="user", cascade="all, delete-orphan")
     
     # Community relationships
-    communities = relationship("Community", back_populates="creator")
-    posts = relationship("Post", back_populates="author")
-    comments = relationship("Comment", back_populates="author")
+    communities = relationship("Community", back_populates="creator", cascade="all, delete-orphan")
+    posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
     
     # Feedback relationship
     feedback = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
@@ -218,6 +261,7 @@ class Timeline(Base):
     year_range = Column(String(50), nullable=False)
     overview = Column(Text)
     main_character_id = Column(Integer, ForeignKey("characters.id", ondelete="SET NULL"), nullable=True)
+    categories= Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship with Stories

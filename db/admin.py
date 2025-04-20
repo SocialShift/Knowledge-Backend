@@ -32,7 +32,7 @@ class ProfileAdmin(ModelView, model=Profile):
     
 class TimelineAdmin(ModelView, model=Timeline):
     column_list = [Timeline.id, Timeline.title, Timeline.thumbnail_url, Timeline.year_range, 
-                   Timeline.overview, Timeline.main_character_id, Timeline.created_at]
+                   Timeline.overview, Timeline.main_character_id, Timeline.categories, Timeline.created_at]
     name = "Timeline"
     name_plural = "Timelines"
     icon = "fa-solid fa-clock-rotate-left"
@@ -40,7 +40,8 @@ class TimelineAdmin(ModelView, model=Timeline):
     # Display related character
     column_formatters = {
         Timeline.main_character: lambda m, a: f"{m.main_character.persona[:30]}..." if m.main_character else "None",
-        Timeline.stories: lambda m, a: f"{len(m.stories)} stories" if m.stories else "No stories"
+        Timeline.stories: lambda m, a: f"{len(m.stories)} stories" if m.stories else "No stories",
+        Timeline.categories: lambda m, a: ", ".join(m.categories) if m.categories else "No categories"
     }
     
 class StoryAdmin(ModelView, model=Story):
