@@ -1,5 +1,6 @@
 from sqladmin import ModelView
-from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback
+from wtforms import SelectMultipleField
+from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory
 
 class UserAdmin(ModelView, model=User):
     column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin]
@@ -36,6 +37,34 @@ class TimelineAdmin(ModelView, model=Timeline):
     name = "Timeline"
     name_plural = "Timelines"
     icon = "fa-solid fa-clock-rotate-left"
+    
+    # Add form_overrides to use a multi-select field for categories
+    form_overrides = {
+        "categories": SelectMultipleField
+    }
+    
+    # Configure the categories field with TimelineCategory options
+    form_args = {
+        "categories": {
+            "choices": [(category.name, category.value) for category in TimelineCategory],
+            "coerce": str
+        }
+    }
+    
+    # Handle JSON conversion when saving the form
+    async def on_model_change(self, model, is_created, request=None, extra_param=None):
+        # The form data is already set to model.categories as a list of strings
+        # No need to do anything else
+        pass
+    
+    # Handle data transformation when loading form data
+    async def on_form_prefill(self, form, id, request=None):
+        # Get the Timeline instance
+        model = self.get_one(id)
+        # If categories exists and is a list, use the values for the form
+        if model and model.categories and isinstance(model.categories, list):
+            # Set the form data to the list of category names
+            form.categories.data = model.categories
     
     # Display related character
     column_formatters = {
