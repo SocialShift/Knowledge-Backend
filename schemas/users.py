@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 class LoginModel(BaseModel):
     email: EmailStr 
@@ -52,6 +52,18 @@ class UserPasswordForgot(BaseModel):
     confirm_new_password: str
 
 
+class FollowerResponse(BaseModel):
+    id: int
+    nickname: Optional[str] = None
+    avatar_url: Optional[str] = None
+    user_id: int
+    follow_date: datetime
+
+    class Config:
+        from_attributes = True
+
+class FollowRequest(BaseModel):
+    profile_id: int
 
 class LeaderboardEntryModel(BaseModel):
     rank: int

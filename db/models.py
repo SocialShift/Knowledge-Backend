@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, JSON, ForeignKey, create_engine,Text,Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, JSON, ForeignKey, create_engine,Text,Date, UniqueConstraint, Table
 from sqlalchemy.orm import relationship, declarative_base, sessionmaker
 from datetime import datetime
 from passlib.context import CryptContext
@@ -150,6 +150,24 @@ class Location(str, enum.Enum):
     WISCONSIN = "Wisconsin"
     WYOMING = "Wyoming"
 
+# User Follow relationship table
+class UserFollow(Base):
+    __tablename__ = "user_follows"
+    
+    id = Column(Integer, primary_key=True)
+    follower_id = Column(Integer, ForeignKey('profiles.id', ondelete="CASCADE"), nullable=False)
+    followed_id = Column(Integer, ForeignKey('profiles.id', ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    follower = relationship("Profile", foreign_keys=[follower_id], back_populates="following")
+    followed = relationship("Profile", foreign_keys=[followed_id], back_populates="followers")
+    
+    __table_args__ = (
+        UniqueConstraint('follower_id', 'followed_id', name='unique_follow_relationship'),
+    )
+    
+    def __repr__(self):
+        return f"Follow: {self.follower_id} -> {self.followed_id}"
 
 # User Model
 class User(Base):
@@ -206,8 +224,12 @@ class Profile(Base):
     # Learning Style
     personalization_questions= Column(JSON, nullable=True)
 
-
+    # Relationship with User
     user= relationship("User", back_populates="profile")
+    
+    # Followers and Following relationships
+    followers = relationship("UserFollow", foreign_keys="UserFollow.followed_id", back_populates="followed", cascade="all, delete-orphan")
+    following = relationship("UserFollow", foreign_keys="UserFollow.follower_id", back_populates="follower", cascade="all, delete-orphan")
 
 
     def __init__(self, **kwargs):

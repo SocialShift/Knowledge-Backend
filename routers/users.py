@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status, UploadFile, File, Form
-from db.models import get_db, User, Profile, QuizAttempt
+from db.models import get_db, User, Profile, QuizAttempt, UserFollow
 from sqlalchemy.orm import Session
-from schemas.users import UserCreateModel, LoginModel, ProfileUpdate, UserEmailUpdate, UserPasswordChange
+from schemas.users import UserCreateModel, LoginModel, ProfileUpdate, UserEmailUpdate, UserPasswordChange, FollowRequest, FollowerResponse
 from fastapi.responses import JSONResponse
 from db.models import pwd_context, Feedback
 from utils.auth import get_current_user, create_session, end_session
 from utils.file_handler import save_image, delete_file
 import json
 from datetime import datetime, date, timedelta
+from sqlalchemy import desc
 from schemas.users import FeedbackCreateModel
 
 router = APIRouter(prefix="/api/auth")
@@ -270,6 +271,47 @@ async def get_profile(
     if streak_bonus:
         request.session.pop("streak_bonus", None)
     
+    # Get followers and following counts
+    followers_count = db.query(UserFollow).filter(UserFollow.followed_id == profile.id).count()
+    following_count = db.query(UserFollow).filter(UserFollow.follower_id == profile.id).count()
+    
+    # Get followers and following (limited to 5 most recent)
+    recent_followers = db.query(UserFollow).filter(UserFollow.followed_id == profile.id).order_by(desc(UserFollow.created_at)).limit(5).all()
+    recent_following = db.query(UserFollow).filter(UserFollow.follower_id == profile.id).order_by(desc(UserFollow.created_at)).limit(5).all()
+    
+    # Check if current user is following this profile
+    is_following = False
+    if current_user.id != id:  # Don't check if viewing own profile
+        current_user_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if current_user_profile:
+            is_following = db.query(UserFollow).filter(
+                UserFollow.follower_id == current_user_profile.id,
+                UserFollow.followed_id == profile.id
+            ).first() is not None
+    
+    # Format followers and following data
+    followers_data = []
+    for follow in recent_followers:
+        follower_profile = follow.follower
+        followers_data.append({
+            "id": follower_profile.id,
+            "nickname": follower_profile.nickname,
+            "avatar_url": follower_profile.avatar_url,
+            "user_id": follower_profile.user_id,
+            "follow_date": follow.created_at
+        })
+    
+    following_data = []
+    for follow in recent_following:
+        followed_profile = follow.followed
+        following_data.append({
+            "id": followed_profile.id,
+            "nickname": followed_profile.nickname,
+            "avatar_url": followed_profile.avatar_url,
+            "user_id": followed_profile.user_id,
+            "follow_date": follow.created_at
+        })
+    
     return {
         "user": {
             "id": current_user.id,
@@ -287,7 +329,136 @@ async def get_profile(
             "language_preference": profile.language_preference,
             "pronouns": profile.pronouns,
             "location": profile.location,
-            "personalization_questions": profile.personalization_questions
+            "personalization_questions": profile.personalization_questions,
+            "followers": {
+                "count": followers_count,
+                "recent": followers_data
+            },
+            "following": {
+                "count": following_count,
+                "recent": following_data
+            },
+            "is_following": is_following
+        },
+        "stats": {
+            "rank": user_rank,
+            "total_users": total_users,
+            "percentile": percentile,
+            "completed_quizzes": completed_quizzes,
+            "current_login_streak": profile.current_login_streak,
+            "max_login_streak": profile.max_login_streak,
+            "days_to_next_milestone": days_to_milestone,
+            "next_milestone": next_milestone,
+            "streak_bonus": streak_bonus
+        }
+    }
+
+
+@router.get("/user/{id}")
+async def get_profile(
+    request: Request,
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the current user's profile with detailed information"""
+    profile = db.query(Profile).filter(Profile.user_id == id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Calculate user rank
+    higher_ranked_count = db.query(Profile).filter(Profile.points > profile.points).count()
+    user_rank = higher_ranked_count + 1
+    
+    # Get total number of users for percentile calculation
+    total_users = db.query(Profile).count()
+    percentile = round((1 - (user_rank / total_users)) * 100) if total_users > 0 else 0
+    
+    # Get completed quizzes count
+    completed_quizzes = db.query(QuizAttempt).filter(
+        QuizAttempt.user_id == current_user.id,
+        QuizAttempt.completed == True
+    ).count()
+    
+    # Calculate days until next streak milestone
+    next_milestone = 7 if profile.current_login_streak < 7 else 30
+    days_to_milestone = next_milestone - (profile.current_login_streak % next_milestone)
+    
+    # Get streak bonus information from the session
+    streak_bonus = request.session.get("streak_bonus", 0)
+    
+    # Clear the streak bonus from the session after reading it
+    if streak_bonus:
+        request.session.pop("streak_bonus", None)
+    
+    # Get followers and following counts
+    followers_count = db.query(UserFollow).filter(UserFollow.followed_id == profile.id).count()
+    following_count = db.query(UserFollow).filter(UserFollow.follower_id == profile.id).count()
+    
+    # Get followers and following (limited to 5 most recent)
+    recent_followers = db.query(UserFollow).filter(UserFollow.followed_id == profile.id).order_by(desc(UserFollow.created_at)).limit(5).all()
+    recent_following = db.query(UserFollow).filter(UserFollow.follower_id == profile.id).order_by(desc(UserFollow.created_at)).limit(5).all()
+    
+    # Check if current user is following this profile
+    is_following = False
+    if current_user.id != id:  # Don't check if viewing own profile
+        current_user_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if current_user_profile:
+            is_following = db.query(UserFollow).filter(
+                UserFollow.follower_id == current_user_profile.id,
+                UserFollow.followed_id == profile.id
+            ).first() is not None
+    
+    # Format followers and following data
+    followers_data = []
+    for follow in recent_followers:
+        follower_profile = follow.follower
+        followers_data.append({
+            "id": follower_profile.id,
+            "nickname": follower_profile.nickname,
+            "avatar_url": follower_profile.avatar_url,
+            "user_id": follower_profile.user_id,
+            "follow_date": follow.created_at
+        })
+    
+    following_data = []
+    for follow in recent_following:
+        followed_profile = follow.followed
+        following_data.append({
+            "id": followed_profile.id,
+            "nickname": followed_profile.nickname,
+            "avatar_url": followed_profile.avatar_url,
+            "user_id": followed_profile.user_id,
+            "follow_date": follow.created_at
+        })
+    
+    return {
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "is_admin": current_user.is_admin,
+            "joined_at": current_user.joined_at
+        },
+        "profile": {
+            "id": profile.id,
+            "nickname": profile.nickname,
+            "avatar_url": profile.avatar_url,
+            "points": profile.points,
+            "referral_code": profile.referral_code,
+            "total_referrals": profile.total_referrals,
+            "language_preference": profile.language_preference,
+            "pronouns": profile.pronouns,
+            "location": profile.location,
+            "personalization_questions": profile.personalization_questions,
+            "followers": {
+                "count": followers_count,
+                "recent": followers_data
+            },
+            "following": {
+                "count": following_count,
+                "recent": following_data
+            },
+            "is_following": is_following
         },
         "stats": {
             "rank": user_rank,
@@ -433,3 +604,157 @@ async def create_feedback(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/follow")
+async def follow_user(
+    data: FollowRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Follow another user's profile"""
+    # Get current user's profile
+    follower_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not follower_profile:
+        raise HTTPException(status_code=404, detail="Your profile not found")
+    
+    # Get the profile to follow
+    followed_profile = db.query(Profile).filter(Profile.id == data.profile_id).first()
+    if not followed_profile:
+        raise HTTPException(status_code=404, detail="Profile to follow not found")
+    
+    # Check if trying to follow self
+    if follower_profile.id == followed_profile.id:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+    
+    # Check if already following
+    existing_follow = db.query(UserFollow).filter(
+        UserFollow.follower_id == follower_profile.id,
+        UserFollow.followed_id == followed_profile.id
+    ).first()
+    
+    if existing_follow:
+        raise HTTPException(status_code=400, detail="Already following this user")
+    
+    # Create the follow relationship
+    new_follow = UserFollow(
+        follower_id=follower_profile.id,
+        followed_id=followed_profile.id
+    )
+    
+    db.add(new_follow)
+    try:
+        db.commit()
+        return {"message": "Successfully followed user"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/unfollow/{profile_id}")
+async def unfollow_user(
+    profile_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Unfollow a user"""
+    # Get current user's profile
+    follower_profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+    if not follower_profile:
+        raise HTTPException(status_code=404, detail="Your profile not found")
+    
+    # Find the follow relationship
+    follow = db.query(UserFollow).filter(
+        UserFollow.follower_id == follower_profile.id,
+        UserFollow.followed_id == profile_id
+    ).first()
+    
+    if not follow:
+        raise HTTPException(status_code=404, detail="You are not following this user")
+    
+    # Delete the follow relationship
+    db.delete(follow)
+    try:
+        db.commit()
+        return {"message": "Successfully unfollowed user"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/followers/{profile_id}")
+async def get_followers(
+    profile_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all followers of a profile with pagination"""
+    profile = db.query(Profile).filter(Profile.id == profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Get followers with pagination
+    follows = db.query(UserFollow).filter(
+        UserFollow.followed_id == profile_id
+    ).order_by(desc(UserFollow.created_at)).offset(skip).limit(limit).all()
+    
+    # Format response
+    followers_data = []
+    for follow in follows:
+        follower_profile = follow.follower
+        followers_data.append({
+            "id": follower_profile.id,
+            "nickname": follower_profile.nickname,
+            "avatar_url": follower_profile.avatar_url,
+            "user_id": follower_profile.user_id,
+            "follow_date": follow.created_at
+        })
+    
+    # Get total count
+    total_count = db.query(UserFollow).filter(UserFollow.followed_id == profile_id).count()
+    
+    return {
+        "followers": followers_data,
+        "total": total_count,
+        "skip": skip,
+        "limit": limit
+    }
+
+@router.get("/following/{profile_id}")
+async def get_following(
+    profile_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all users a profile is following with pagination"""
+    profile = db.query(Profile).filter(Profile.id == profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Get following with pagination
+    follows = db.query(UserFollow).filter(
+        UserFollow.follower_id == profile_id
+    ).order_by(desc(UserFollow.created_at)).offset(skip).limit(limit).all()
+    
+    # Format response
+    following_data = []
+    for follow in follows:
+        followed_profile = follow.followed
+        following_data.append({
+            "id": followed_profile.id,
+            "nickname": followed_profile.nickname,
+            "avatar_url": followed_profile.avatar_url,
+            "user_id": followed_profile.user_id,
+            "follow_date": follow.created_at
+        })
+    
+    # Get total count
+    total_count = db.query(UserFollow).filter(UserFollow.follower_id == profile_id).count()
+    
+    return {
+        "following": following_data,
+        "total": total_count,
+        "skip": skip,
+        "limit": limit
+    }
