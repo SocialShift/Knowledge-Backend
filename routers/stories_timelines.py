@@ -66,7 +66,7 @@ async def create_otd(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/list/otd")
-def get_all_otd(db: Session = Depends(get_db)):
+async def get_all_otd(db: Session = Depends(get_db)):
     otd_entries = db.query(OnThisDay).all()
     return otd_entries
     # Convert each entry to a dictionary with proper None handling
@@ -150,7 +150,7 @@ async def get_user_rank(
     }
 
 @router.get("/otd/date/{date}")
-def get_otd_by_date(date: date, db: Session = Depends(get_db)):
+async def get_otd_by_date(date: date, db: Session = Depends(get_db)):
     otd_entry = db.query(OnThisDay).filter(OnThisDay.date == date).first()
     if not otd_entry:
         raise HTTPException(status_code=404, detail="No historical event found for this date")
@@ -159,7 +159,7 @@ def get_otd_by_date(date: date, db: Session = Depends(get_db)):
     return (otd_entry)
 
 @router.delete("/otd/{id}")
-def delete_otd(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def delete_otd(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     otd_entry = db.query(OnThisDay).filter(OnThisDay.id == id).first()
     if not otd_entry:
         raise HTTPException(status_code=404, detail="OTD entry not found")

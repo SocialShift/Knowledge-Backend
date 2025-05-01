@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+import os
+import sqladmin
+import shutil
 
 app= FastAPI()
 
@@ -27,6 +30,25 @@ app.add_middleware(
 )
 
 # Mount the media directory to serve static files
+# Create your local static directory if not exists
+static_path = Path("static")
+static_path.mkdir(exist_ok=True)
+
+# Path to sqladmin's statics directory
+sqladmin_static_path = os.path.join(os.path.dirname(sqladmin.__file__), "statics")
+
+# Copy files from sqladmin/statics to your static/ dir
+for item in os.listdir(sqladmin_static_path):
+    src = os.path.join(sqladmin_static_path, item)
+    dest = os.path.join(static_path, item)
+    if os.path.isdir(src):
+        shutil.copytree(src, dest, dirs_exist_ok=True)
+    else:
+        shutil.copy2(src, dest)
+
+# Mount your static directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 media_path = Path("media")
 media_path.mkdir(exist_ok=True)
 app.mount("/media", StaticFiles(directory="media"), name="media")
