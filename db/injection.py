@@ -22,8 +22,9 @@ client = OpenAI()
 #client = #AzureOpenAI(api_version="2024-12-01-preview",api_key= os.environ['OPENAI_API_KEY'], azure_endpoint="https://beta101.openai.azure.com/")
 
 # Authentication cookie (replace with your actual cookie)
-AUTH_COOKIE = "eyJ1c2VyX2lkIjogOCwgImVtYWlsIjogIm5qbmF5YW4yMjJAZ21haWwuY29tIn0=.Z_qPEA.6TzWm-nPCJR4Ug3HD-xskn9KnK8"
-BASE_URL = "https://knowledge-backend-rqya.onrender.com/api"
+AUTH_COOKIE= "eyJ1c2VyX2lkIjogMywgImVtYWlsIjogImFAYS5jb20ifQ==.aBT87w.uEannVjFa1ShdgPzIsBXB_zmiyc"
+#BASE_URL= "http://127.0.0.1:8000/api"
+BASE_URL = "https://api.knowhistory.xyz/api"
 
 # Thread management
 def get_or_create_thread():
