@@ -14,7 +14,7 @@ from datetime import datetime
 import uuid
 from pathlib import Path
 from video_generator import create_video
-
+from categories import generate_categories
 load_dotenv()
 
 # Initialize OpenAI client
@@ -182,13 +182,15 @@ def create_timeline(title, year_range, overview, main_character_id, timeline_des
     # Generate timeline image
     print(f"Generating image for timeline: {title}")
     thumbnail_file_path = generate_image(f"Historical representation of {timeline_description} during {year_range}")
-    
+
+    categories = generate_categories(title, overview, client)
     form_data = {
         "title": title,
         "year_range": year_range,
         "overview": overview,
         "main_character_id": main_character_id,
-        "thumbnail_file": thumbnail_file_path
+        "thumbnail_file": thumbnail_file_path,
+        "categories": categories
     }
     
     response = upload_media(url, form_data)
