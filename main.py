@@ -9,6 +9,7 @@ from pathlib import Path
 import os
 import sqladmin
 import shutil
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 app= FastAPI()
 
@@ -29,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(HTTPSRedirectMiddleware)
 # Mount the media directory to serve static files
 # Create your local static directory if not exists
 static_path = Path("static")

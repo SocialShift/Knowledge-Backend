@@ -190,7 +190,7 @@ def create_timeline(title, year_range, overview, main_character_id, timeline_des
         "overview": overview,
         "main_character_id": main_character_id,
         "thumbnail_file": thumbnail_file_path,
-        "categories": categories
+        "categories_json": categories
     }
     
     response = upload_media(url, form_data)

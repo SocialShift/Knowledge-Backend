@@ -182,7 +182,7 @@ async def create_timeline(
     year_range: str = Form(...),
     overview: str = Form(...),
     main_character_id: Optional[int] = Form(None),
-    categories_json: str= Form("[]"),
+    categories_json: Optional[str] = Form("[]"),
     thumbnail_file: UploadFile = File(...),
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
@@ -190,8 +190,8 @@ async def create_timeline(
     # Validate with Pydantic
     try:
         # Parse categories from JSON if provided
-        categories = None
-        if categories_json:
+        categories = []
+        if categories_json and categories_json.strip():
             try:
                 categories = json.loads(categories_json)
             except json.JSONDecodeError:

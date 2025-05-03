@@ -31,8 +31,11 @@ def generate_categories(title: str, overview: str, client=None):
         research_paper = response.output_parsed
         print(research_paper.model_dump_json())
         
+        # Extract string values from enum objects
+        category_values = [category.value for category in research_paper.categories]
+        
         # Ask for user confirmation
         user_confirmation = input("Are you satisfied with these categories? (yes/no): ").lower()
         if user_confirmation == "yes":
-            return (json.dumps(research_paper.categories))
+            return json.dumps(category_values)
         print("Regenerating categories...")
