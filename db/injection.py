@@ -455,13 +455,15 @@ Please provide extensive, richly detailed ideas for:
 1. A character profile (historical figure or composite representative) with a VERY BRIEF persona description (3-5 words)
 2. A timeline with a VERY BRIEF title (3-5 words) and precise year range
 3. At least 3 detailed stories within that timeline (each should be substantial, 5-7 paragraphs) with VERY BRIEF titles (3-5 words)
-4. Quiz questions for each story (with 4 options per question)
+4. For each story, create AT LEAST 3-5 quiz questions (with 4 options per question) that test understanding of the key concepts
 
 Each story should include a detailed visual description that can be used to generate either an image or a short video.
 
 Focus on historically accurate information about underrepresented groups. The content should be college-level depth and detail while remaining engaging.
 
-IMPORTANT: All titles and persona descriptions MUST be extremely concise (max 5-7 words)."""
+IMPORTANT: 
+- All titles and persona descriptions MUST be extremely concise (max 5-7 words)
+- Each story MUST have 3-5 quiz questions (not just 1)"""
     )
     
     # Run the assistant
@@ -538,7 +540,8 @@ def process_content(content):
                             {{"text": "Option 3", "is_correct": false}},
                             {{"text": "Option 4", "is_correct": false}}
                         ]
-                    }}
+                    }},
+                    // Include AT LEAST 2-4 more questions here
                 ]
             }}
         ]
@@ -555,10 +558,11 @@ def process_content(content):
         IMPORTANT: 
         1. Each question MUST have EXACTLY 4 options
         2. Each story MUST have a corresponding quiz in the quizzes array
-        3. Preserve all paragraph breaks and formatting in the descriptions
-        4. Add an appropriate image description for each element
-        5. KEEP ALL TITLES AND PERSONA DESCRIPTIONS EXTREMELY BRIEF (3-5 words)
-        6. For story_date, use EXACTLY the format YYYY-MM-DD (example: 1963-08-28)
+        3. Each quiz MUST contain AT LEAST 3 to 5 questions (not just 1)
+        4. Preserve all paragraph breaks and formatting in the descriptions
+        5. Add an appropriate image description for each element
+        6. KEEP ALL TITLES AND PERSONA DESCRIPTIONS EXTREMELY BRIEF (3-5 words)
+        7. For story_date, use EXACTLY the format YYYY-MM-DD (example: 1963-08-28)
            - For ancient/BCE dates, use 0001-01-01 as a placeholder
            - For date ranges or uncertain dates, pick a specific representative date
         """
