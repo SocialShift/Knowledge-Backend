@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Body, Path
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Path
 from db.models import get_db, StandAloneGameQuestion, StandAloneGameOption, StandAloneGameAttempt, GameTypes, User
 from sqlalchemy.orm import Session
 from utils.file_handler import save_image, delete_file
@@ -6,7 +6,7 @@ from schemas.games import (
     GameQuestion, 
     GameAttemptCreate, GameAttempt, PaginatedGames, GameOptionCreate
 )
-from typing import List, Optional, Dict
+from typing import List, Optional
 from utils.auth import get_current_user
 import math
 import os
