@@ -45,3 +45,5 @@ S3_BUCKET_NAME=your-bucket-name
 5. Ensure your S3 bucket has public read access if you need direct public access to uploaded files
 
 The application will automatically use S3 for media storage when `S3_ENABLED=true` and fall back to local storage if S3 upload fails. 
+alembic revision --autogenerate -m "your migration message"
+alembic upgrade head

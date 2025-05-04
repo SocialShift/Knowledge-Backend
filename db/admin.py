@@ -1,6 +1,6 @@
 from sqladmin import ModelView
 from wtforms import SelectMultipleField
-from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory
+from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes
 
 class UserAdmin(ModelView, model=User):
     column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin]
@@ -187,4 +187,28 @@ class FeedbackAdmin(ModelView, model=Feedback):
     # Display related user
     column_formatters = {
         Feedback.user: lambda m, a: f"{m.user.email}" if m.user else "None"
+    }
+
+class StandAloneGameQuestionAdmin(ModelView, model=StandAloneGameQuestion):
+    column_list = [StandAloneGameQuestion.id, StandAloneGameQuestion.game_type, StandAloneGameQuestion.title, 
+                   StandAloneGameQuestion.image_url, StandAloneGameQuestion.created_at]
+    name = "StandAlone Game Question"
+    name_plural = "StandAlone Game Questions"
+    icon = "fa-solid fa-gamepad"
+    
+    # Display related options
+    column_formatters = {
+        StandAloneGameQuestion.options: lambda m, a: f"{len(m.options)} options" if m.options else "No options"
+    }
+
+class StandAloneGameOptionAdmin(ModelView, model=StandAloneGameOption):
+    column_list = [StandAloneGameOption.id, StandAloneGameOption.question_id, StandAloneGameOption.text, 
+                   StandAloneGameOption.is_correct]
+    name = "StandAlone Game Option"
+    name_plural = "StandAlone Game Options"
+    icon = "fa-solid fa-list-check"
+    
+    # Display related question
+    column_formatters = {
+        StandAloneGameOption.question: lambda m, a: f"{m.question.title}" if m.question else "None"
     }

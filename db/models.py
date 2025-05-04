@@ -459,3 +459,55 @@ class Feedback(Base):
 
     def __repr__(self):
         return f"Feedback by {self.user_id}"
+    
+
+
+class GameTypes(enum.IntEnum):
+    GUESS_THE_YEAR= 1
+    IMAGE_GUESS= 2
+    FILL_IN_THE_BLANK= 3
+    
+
+class StandAloneGameQuestion(Base):
+    __tablename__= "stand_alone_games"
+
+    id= Column(Integer, primary_key=True)
+    game_type= Column(Enum(GameTypes), nullable=False)
+    title= Column(String(255), nullable=False)
+    image_url= Column(String(255), nullable=True)
+    created_at= Column(DateTime, default=datetime.utcnow)
+
+    # Add relationship to options
+    options = relationship("StandAloneGameOption", back_populates="question", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return self.title
+    
+class StandAloneGameOption(Base):
+    __tablename__= "stand_alone_games_options"
+
+    id = Column(Integer, primary_key=True)
+    question_id = Column(Integer, ForeignKey("stand_alone_games.id", ondelete="CASCADE"))
+    text = Column(String(255), nullable=False)  # Answer text
+    is_correct = Column(Boolean, default=False)  # Only one option should be correct
+
+    # Add relationship to question
+    question = relationship("StandAloneGameQuestion", back_populates="options")
+
+class StandAloneGameAttempt(Base):
+    __tablename__ = "stand_alone_game_attempts"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    game_id = Column(Integer, ForeignKey("stand_alone_games.id", ondelete="CASCADE"))
+    selected_option_id = Column(Integer, ForeignKey("stand_alone_games_options.id", ondelete="SET NULL"), nullable=True)
+    is_correct = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+    game = relationship("StandAloneGameQuestion")
+    selected_option = relationship("StandAloneGameOption")
+
+    def __repr__(self):
+        return f"Attempt on game {self.game_id} by user {self.user_id}"

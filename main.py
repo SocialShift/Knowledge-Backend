@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import users, stories_timelines, communities_posts
+from routers import users, stories_timelines, communities_posts, games
 from db.models import engine, Base
 from utils.auth import SECRET_KEY
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,9 +30,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(HTTPSRedirectMiddleware)
-# Mount the media directory to serve static files
-# Create your local static directory if not exists
+#app.add_middleware(HTTPSRedirectMiddleware)
+
+
 static_path = Path("static")
 static_path.mkdir(exist_ok=True)
 
@@ -60,6 +60,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(users.router)
 app.include_router(stories_timelines.router)
 app.include_router(communities_posts.router)
+app.include_router(games.router)
 
 # Include admin
 from sqladmin import Admin
@@ -79,7 +80,9 @@ from db.admin import (
     QuizAttemptAdmin,
     UserStoryLikeAdmin,
     TimestampAdmin,
-    FeedbackAdmin
+    FeedbackAdmin,
+    StandAloneGameQuestionAdmin,
+    StandAloneGameOptionAdmin
 )
 
 admin.add_view(UserAdmin)
@@ -95,6 +98,8 @@ admin.add_view(QuizAttemptAdmin)
 admin.add_view(UserStoryLikeAdmin)
 admin.add_view(TimestampAdmin)
 admin.add_view(FeedbackAdmin)
+admin.add_view(StandAloneGameQuestionAdmin)
+admin.add_view(StandAloneGameOptionAdmin)
 
 if __name__== "__main__":
     import uvicorn
