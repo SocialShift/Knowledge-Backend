@@ -21,6 +21,7 @@ async def create_game_question(
     game_type: int = Form(...),
     options_json: str = Form(...),
     image_file: Optional[UploadFile] = File(None),
+    story_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):    
@@ -45,7 +46,8 @@ async def create_game_question(
     new_question = StandAloneGameQuestion(
         title=title,
         game_type=game_type,
-        image_url=image_url
+        image_url=image_url,
+        story_id=story_id
     )
     print(new_question)
     db.add(new_question)
@@ -95,7 +97,8 @@ async def create_bulk_game_questions(
             new_question = StandAloneGameQuestion(
                 title=question_data.get("title"),
                 game_type=game_type,
-                image_url=question_data.get("image_url")
+                image_url=question_data.get("image_url"),
+                story_id=question_data.get("story_id")
             )
             
             db.add(new_question)
@@ -172,6 +175,7 @@ async def update_game_question(
     game_type: Optional[int] = Form(None), 
     options_json: Optional[str] = Form(None),
     image_file: Optional[UploadFile] = File(None),
+    story_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -191,6 +195,8 @@ async def update_game_question(
     if game_type is not None:
         question.game_type = game_type
     
+    if story_id is not None:
+        question.story_id = story_id
     # Handle image file update
     old_image_url = None
     if image_file:

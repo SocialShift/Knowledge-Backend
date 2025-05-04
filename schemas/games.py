@@ -17,6 +17,7 @@ class GameQuestionBase(BaseModel):
     title: str
     game_type: GameTypes
     image_url: Optional[str] = None
+    story_id: Optional[int] = None
 
 # Create schemas - Used for validation only, not for direct API input
 class GameOptionCreate(GameOptionBase):

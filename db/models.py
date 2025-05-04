@@ -323,6 +323,7 @@ class Story(Base):
     on_this_day = relationship("OnThisDay", back_populates="story", uselist=False)
     timestamps = relationship("Timestamp", back_populates="story", cascade="all, delete-orphan")
     quiz = relationship("Quiz", back_populates="story", uselist=False, cascade="all, delete-orphan")
+    stand_alone_games = relationship("StandAloneGameQuestion", back_populates="story")
 
     def __repr__(self):
         return self.title
@@ -475,10 +476,14 @@ class StandAloneGameQuestion(Base):
     game_type= Column(Enum(GameTypes), nullable=False)
     title= Column(String(255), nullable=False)
     image_url= Column(String(255), nullable=True)
+    story_id= Column(Integer, ForeignKey("stories.id", ondelete="SET NULL"), nullable=True)
     created_at= Column(DateTime, default=datetime.utcnow)
 
     # Add relationship to options
     options = relationship("StandAloneGameOption", back_populates="question", cascade="all, delete-orphan")
+    
+    # Add relationship to story
+    story = relationship("Story", back_populates="stand_alone_games")
 
     def __repr__(self):
         return self.title
