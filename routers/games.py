@@ -21,7 +21,7 @@ async def create_game_question(
     game_type: int = Form(...),
     options_json: str = Form(...),
     image_file: Optional[UploadFile] = File(None),
-    story_id: Optional[int] = Form(None),
+    story_id: int = Form(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):    
