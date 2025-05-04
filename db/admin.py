@@ -1,6 +1,6 @@
 from sqladmin import ModelView
 from wtforms import SelectMultipleField
-from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes
+from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes, StandAloneGameAttempt
 
 class UserAdmin(ModelView, model=User):
     column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin]
@@ -212,3 +212,11 @@ class StandAloneGameOptionAdmin(ModelView, model=StandAloneGameOption):
     column_formatters = {
         StandAloneGameOption.question: lambda m, a: f"{m.question.title}" if m.question else "None"
     }
+
+class StandAloneGameAttemptAdmin(ModelView, model=StandAloneGameAttempt):
+    column_list = [StandAloneGameAttempt.id, StandAloneGameAttempt.user_id, StandAloneGameAttempt.game_id, 
+                   StandAloneGameAttempt.selected_option_id, StandAloneGameAttempt.is_correct, 
+                   StandAloneGameAttempt.created_at]
+    name = "StandAlone Game Attempt"
+    name_plural = "StandAlone Game Attempts"
+    icon = "fa-solid fa-gamepad"

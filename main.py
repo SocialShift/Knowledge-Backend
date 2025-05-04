@@ -82,7 +82,8 @@ from db.admin import (
     TimestampAdmin,
     FeedbackAdmin,
     StandAloneGameQuestionAdmin,
-    StandAloneGameOptionAdmin
+    StandAloneGameOptionAdmin,
+    StandAloneGameAttemptAdmin
 )
 
 admin.add_view(UserAdmin)
@@ -100,6 +101,7 @@ admin.add_view(TimestampAdmin)
 admin.add_view(FeedbackAdmin)
 admin.add_view(StandAloneGameQuestionAdmin)
 admin.add_view(StandAloneGameOptionAdmin)
+admin.add_view(StandAloneGameAttemptAdmin)
 
 if __name__== "__main__":
     import uvicorn
