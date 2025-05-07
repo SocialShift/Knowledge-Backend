@@ -373,6 +373,10 @@ class QuizAttempt(Base):
     created_at= Column(DateTime, default=datetime.utcnow)
     completed_at= Column(DateTime, nullable=True)  # When the quiz was completed
 
+    # Add relationships
+    user = relationship("User")
+    quiz = relationship("Quiz")
+    
     __table_args__ = (
         UniqueConstraint('user_id', 'quiz_id', name='unique_user_quiz'),
     )

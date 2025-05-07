@@ -149,11 +149,6 @@ class QuizAttemptAdmin(ModelView, model=QuizAttempt):
     name_plural = "Quiz Attempts"
     icon = "fa-solid fa-clipboard-check"
     
-    # Display related user and quiz
-    column_formatters = {
-        QuizAttempt.user_id: lambda m, a: f"{User.query.get(m.user_id).email}" if User.query.get(m.user_id) else f"User #{m.user_id}",
-        QuizAttempt.quiz_id: lambda m, a: f"Quiz #{m.quiz_id}"
-    }
 
 class UserStoryLikeAdmin(ModelView, model=UserStoryLike):
     column_list = [UserStoryLike.id, UserStoryLike.user_id, UserStoryLike.story_id, UserStoryLike.created_at]
