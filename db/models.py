@@ -11,16 +11,50 @@ load_dotenv()
 # Database setup
 #DATABASE_URL = "postgresql://postgres:Iamreal123@localhost/knowledge"
 DATABASE_URL= os.environ['DATABASE_URL']
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verify connections before using them
+    pool_recycle=3600,   # Recycle connections after 1 hour
+    pool_timeout=30,     # Timeout for getting a connection from pool
+    max_overflow=10,     # Allow 10 connections to be created beyond pool_size
+    pool_size=10,        # Maintain a pool of 10 connections
+    connect_args={
+        "connect_timeout": 10,  # 10 seconds connection timeout
+        "keepalives": 1,        # Enable TCP keepalives
+        "keepalives_idle": 60,  # Idle time before sending keepalives
+        "keepalives_interval": 10,  # Time between keepalives
+        "keepalives_count": 3   # Number of keepalives before giving up
+    }
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
+    db = None
+    retry_count = 0
+    max_retries = 3
+    
+    while retry_count < max_retries:
+        try:
+            db = SessionLocal()
+            yield db
+            break
+        except Exception as e:
+            retry_count += 1
+            if retry_count >= max_retries:
+                # Re-raise the exception if we've exhausted retries
+                raise
+            # Log the error (you may want to implement proper logging)
+            print(f"Database connection error (attempt {retry_count}/{max_retries}): {str(e)}")
+            # If we had a connection but it failed, ensure it's closed
+            if db is not None:
+                try:
+                    db.close()
+                except:
+                    pass
+    
+    if db is not None:
         db.close()
 
         
