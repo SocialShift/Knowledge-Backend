@@ -43,6 +43,9 @@ async def create_user(request: Request, data: UserCreateModel, db: Session = Dep
     try:
         db.commit()
         db.refresh(new_user)
+        # Generate username after user is created and has an ID
+        new_user.generate_username()
+        db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -62,7 +65,8 @@ async def create_user(request: Request, data: UserCreateModel, db: Session = Dep
         'detail': 'New User created',
         'user': {
             'id': new_user.id,
-            'email': new_user.email
+            'email': new_user.email,
+            'username': new_user.username
         }
     }, status_code=status.HTTP_201_CREATED)
 
@@ -757,4 +761,65 @@ async def get_following(
         "total": total_count,
         "skip": skip,
         "limit": limit
+    }
+
+@router.get("/search")
+async def search_users(
+    query: str,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Search for users by username or nickname
+    Flexible search that returns matches for either field
+    """
+    if not query or len(query.strip()) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Search query must be at least 2 characters"
+        )
+    
+    # Search for users with matching username or profiles with matching nickname
+    # Using ILIKE for case-insensitive matching with wildcards
+    search_pattern = f"%{query}%"
+    
+    # Query users and join with their profiles
+    results = db.query(User, Profile).join(Profile, User.id == Profile.user_id).filter(
+        (User.username.ilike(search_pattern)) | 
+        (Profile.nickname.ilike(search_pattern))
+    ).offset(skip).limit(limit).all()
+    
+    # Format the results
+    users_data = []
+    for user, profile in results:
+        if user.id != current_user.id:  # Exclude current user from results
+            # Check if current user is following this profile
+            is_following = db.query(UserFollow).filter(
+                UserFollow.follower_id == current_user.profile.id,
+                UserFollow.followed_id == profile.id
+            ).first() is not None
+            
+            users_data.append({
+                "user_id": user.id,
+                "username": user.username,
+                "profile_id": profile.id,
+                "nickname": profile.nickname,
+                "avatar_url": profile.avatar_url,
+                "is_following": is_following
+            })
+    
+    # Count total matching results (without pagination)
+    total_count = db.query(User, Profile).join(Profile, User.id == Profile.user_id).filter(
+        (User.username.ilike(search_pattern)) | 
+        (Profile.nickname.ilike(search_pattern))
+    ).count()
+    
+    return {
+        "users": users_data,
+        "total": total_count,
+        "skip": skip,
+        "limit": limit,
+        "query": query
     }

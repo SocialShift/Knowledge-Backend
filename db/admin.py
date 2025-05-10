@@ -3,7 +3,7 @@ from wtforms import SelectMultipleField
 from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes, StandAloneGameAttempt
 
 class UserAdmin(ModelView, model=User):
-    column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin]
+    column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin, User.username]
     name = "User"
     name_plural = "Users"
     icon = "fa-solid fa-user"

@@ -209,6 +209,7 @@ class User(Base):
 
     id= Column(Integer, primary_key=True)
     email= Column(String(255), unique=True, nullable=False)
+    username= Column(String(255), unique=True, nullable=True)
     password= Column(String(255), nullable=False)
     joined_at= Column(DateTime, default=datetime.now())
     is_active= Column(Boolean, default=True)
@@ -231,6 +232,11 @@ class User(Base):
     def set_password(self, password):
         self.password= pwd_context.hash(password)
 
+    def generate_username(self):
+        if self.email and self.id:
+            email_username = self.email.split('@')[0]
+            self.username = f"{email_username}{self.id}"
+        return self.username
     
     def __repr__(self):
         return self.email
