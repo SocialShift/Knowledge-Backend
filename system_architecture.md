@@ -99,6 +99,43 @@ The system is built on a relational database with the following key entities:
                                                          +----------------------+
 ```
 
+## Gamification System
+
+The platform employs a comprehensive points system to encourage user engagement and educational progress.
+
+### Points Allocation
+
+| Activity                               | Points Awarded      | Notes                                       |
+|----------------------------------------|---------------------|---------------------------------------------|
+| **Daily Login**                        | 10 points           | Once per day                                |
+| **Login Streak**                       | 5 points per day    | Additional points after 3 consecutive days  |
+| **Login Streak Milestone (7 days)**    | 25 bonus points     | One-time bonus per 7-day streak             |
+| **Login Streak Milestone (30 days)**   | 100 bonus points    | One-time bonus per 30-day streak            |
+| **Quiz Completion**                    | 20 points           | Base completion reward                      |
+| **Quiz Perfect Score**                 | 15 bonus points     | Additional for 100% correct answers         |
+| **Quiz Question (correct)**            |5 points per question| Awarded per correct answer                  |
+| **Game Completion (any type)**         | 15 points           | Base completion reward                      |
+| **Game Correct Answer**                | 10 points per answer| Awarded per correct answer                  |
+| **Game Type Bonus (all types)**        | 25 bonus points     | Completing all game types for a story       |
+| **Story Viewing**                      | 5 points            | First time viewing a story                  |
+| **Story Video (complete)**             | 10 points           | Watching an entire story video              |
+| **Referral**                           | 50 points           | When a referred user completes registration |
+
+### Points System Mechanics
+
+The points system is designed to:
+1. **Reward Consistency**: Daily logins and streaks incentivize regular engagement
+2. **Promote Learning**: Higher points for educational activities (quizzes, games)
+3. **Encourage Exploration**: Points for discovering different stories and timelines
+4. **Build Community**: Rewards for referrals and social interactions
+
+### Streak System Implementation
+- The system tracks consecutive daily logins
+- Streaks are broken if a user misses a day
+- Maximum streak is recorded historically 
+- Bonus points increase with longer streaks
+- Profile showcases current and maximum streaks
+
 ## Core Workflows
 
 ### 1. Content Generation (injection.py)
