@@ -146,10 +146,14 @@ def upload_media(url, form_data):
     
     return response.json()
 
-def create_character(persona, avatar_description):
+def create_character(persona, avatar_description, name=None):
     """Create a character with the given persona and generated avatar"""
     url = f"{BASE_URL}/character/create"
     
+    # Set default name if not provided
+    if name is None:
+        # Extract a name from the persona or use a default
+        name = persona.split()[0] if persona else "Historical Figure"
     # Enforce brevity in persona
     words = persona.split()
     if len(words) > 7:
@@ -161,6 +165,7 @@ def create_character(persona, avatar_description):
     avatar_file_path = generate_image(f"Historical portrait of {avatar_description}")
     
     form_data = {
+        "name": name,
         "persona": persona,
         "avatar_file": avatar_file_path
     }
@@ -507,6 +512,7 @@ def process_content(content):
         content=f"""Please structure the following content into a JSON format with these keys:
         
         1. character: {{
+            "name": "Name of the historical figure",
             "persona": "BRIEF description of the historical figure (max 5-7 words)",
             "avatar_description": "Description for generating an image of this character"
         }}
@@ -652,11 +658,17 @@ def validate_structured_data(structured_data):
     modified = False
     
     # Check and trim character persona
-    if "character" in structured_data and "persona" in structured_data["character"]:
-        persona = structured_data["character"]["persona"]
-        words = persona.split()
-        if len(words) > 7:
-            structured_data["character"]["persona"] = " ".join(words[:7])
+    if "character" in structured_data:
+        if "persona" in structured_data["character"]:
+            persona = structured_data["character"]["persona"]
+            words = persona.split()
+            if len(words) > 7:
+                structured_data["character"]["persona"] = " ".join(words[:7])
+                modified = True
+        
+        # Ensure character has a name
+        if "name" not in structured_data["character"] or not structured_data["character"]["name"]:
+            structured_data["character"]["name"] = "Historical Figure"
             modified = True
     
     # Check and trim timeline title
@@ -795,9 +807,11 @@ def main():
             try:
                 # 1. Create character
                 print("\nCreating character...")
+                character_name = structured_data["character"].get("name", "Historical Figure")
                 character_response, character_image = create_character(
                     structured_data["character"]["persona"],
-                    structured_data["character"]["avatar_description"]
+                    structured_data["character"]["avatar_description"],
+                    name=character_name
                 )
                 created_files.append(character_image)
                 

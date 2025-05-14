@@ -162,6 +162,7 @@ class QuizAttemptResponseModel(BaseModel):
         from_attributes = True
 
 class CharacterCreateModel(BaseModel):
+    name: str
     persona: str
     avatar_file: Optional[UploadFile] = None
     
@@ -169,6 +170,7 @@ class CharacterCreateModel(BaseModel):
         arbitrary_types_allowed = True
 
 class CharacterUpdateModel(BaseModel):
+    name: Optional[str] = None
     persona: Optional[str] = None
     
     class Config:
@@ -176,6 +178,7 @@ class CharacterUpdateModel(BaseModel):
 
 class CharacterResponseModel(BaseModel):
     id: int
+    name: str
     persona: str
     avatar_url: Optional[str] = None
     created_at: datetime

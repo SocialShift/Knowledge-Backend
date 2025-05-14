@@ -1285,6 +1285,7 @@ async def get_characters(db: Session = Depends(get_db), current_user: User = Dep
     for character in characters:
         character_data = {
             "id": character.id,
+            "name": character.name,
             "persona": character.persona,
             "avatar_url": character.avatar_url,
             "created_at": character.created_at
@@ -1295,6 +1296,7 @@ async def get_characters(db: Session = Depends(get_db), current_user: User = Dep
 
 @router.post('/character/create', response_model=CharacterResponseModel)
 async def create_character(
+    name: str = Form(...),
     persona: str = Form(...),
     avatar_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -1304,6 +1306,7 @@ async def create_character(
     try:
         # Validate with Pydantic
         validated_data = CharacterCreateModel(
+            name=name,
             persona=persona
         )
     except Exception as e:
@@ -1314,6 +1317,7 @@ async def create_character(
     
     # Create character
     new_character = Character(
+        name=validated_data.name,
         persona=validated_data.persona,
         avatar_url=avatar_url
     )
@@ -1346,6 +1350,7 @@ async def get_character(
 @router.patch('/character/update/{character_id}', response_model=CharacterResponseModel)
 async def update_character(
     character_id: int,
+    name: Optional[str] = Form(None),
     persona: Optional[str] = Form(None),
     avatar_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -1360,6 +1365,8 @@ async def update_character(
     
     # Create update data dictionary
     update_data = {}
+    if name is not None:
+        update_data["name"] = name
     if persona is not None:
         update_data["persona"] = persona
     

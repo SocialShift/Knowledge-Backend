@@ -306,6 +306,7 @@ class Character(Base):
     __tablename__= "characters"
 
     id= Column(Integer, primary_key=True)
+    name= Column(String(255), default="name")
     avatar_url= Column(String(255), unique=True, nullable=True)
     persona= Column(Text, nullable=False)
     created_at= Column(DateTime, default=datetime.utcnow)

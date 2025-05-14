@@ -124,7 +124,7 @@ class OptionAdmin(ModelView, model=Option):
     }
     
 class CharacterAdmin(ModelView, model=Character):
-    column_list = [Character.id, Character.avatar_url, Character.persona, Character.created_at]
+    column_list = [Character.id, Character.name, Character.avatar_url, Character.persona, Character.created_at]
     name = "Character"
     name_plural = "Characters"
     icon = "fa-solid fa-user-astronaut"
