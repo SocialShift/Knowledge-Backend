@@ -121,7 +121,7 @@ For ALL game types:
         "game_type": game_type_selection,
         "questions_json": questions_json
     }
-    
+     
     try:
         print(f"Sending {len(questions)} questions to API at {url}")
         response = requests.post(url, headers=headers, data=form_data)
