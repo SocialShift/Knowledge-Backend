@@ -11,6 +11,7 @@ import requests
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Now import from project modules
+from utils.s3_handler import upload_local_file_to_s3
 from injection import AUTH_COOKIE, BASE_URL, generate_image, upload_media
 from models import Story
 from schemas.games import GameOptionBase
@@ -98,6 +99,7 @@ For ALL game types:
                     # Generate the image using DALL-E through the injection module
                     # This will handle image generation, download and storage
                     image_path = generate_image(f"Historical image showing {image_description}")
+                    image_url= upload_local_file_to_s3(image_path)
                     
                     # The generate_image function already:
                     # 1. Generates the image using DALL-E
@@ -106,8 +108,8 @@ For ALL game types:
                     # 4. Returns the file path
                     
                     # Just use the generated file path directly
-                    question.image_url = image_path
-                    print(f"✓ Image generated and saved: {image_path}")
+                    question.image_url = image_url
+                    print(f"✓ Image generated and saved: {image_url}")
                 except Exception as e:
                     print(f"Error generating image: {e}")
                     question.image_url = None

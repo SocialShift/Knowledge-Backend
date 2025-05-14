@@ -109,4 +109,53 @@ def delete_file_from_s3(s3_url: str) -> bool:
     except ClientError as e:
         print(f"Error deleting from S3: {e}")
     
-    return False 
+    return False
+
+def upload_local_file_to_s3(file_path, directory="images") -> str:
+    """
+    Upload a local file to S3 and return the S3 URL
+    
+    Args:
+        file_path: Path to the local file
+        directory: Directory prefix within the S3 bucket (default: "images")
+        
+    Returns:
+        S3 URL if successful, file_path as fallback
+    """
+    if not S3_ENABLED or not s3_client:
+        return file_path  # Return the local path if S3 is not enabled
+    
+    if not os.path.exists(file_path):
+        print(f"File not found: {file_path}")
+        return file_path
+    
+    try:
+        # Generate a unique filename
+        filename = os.path.basename(file_path)
+        file_extension = os.path.splitext(filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        
+        # Create the full object key with directory prefix
+        object_key = f"{directory}/{unique_filename}"
+        
+        # Upload the file
+        with open(file_path, 'rb') as file_obj:
+            s3_client.upload_fileobj(
+                file_obj,
+                S3_BUCKET_NAME,
+                object_key,
+                ExtraArgs={'ContentType': 'image/png' if directory == "images" else 'application/octet-stream'}
+            )
+        
+        # Construct and return the S3 URL
+        if AWS_REGION == "us-east-1":
+            s3_url = f"https://{S3_BUCKET_NAME}.s3.amazonaws.com/{object_key}"
+        else:
+            s3_url = f"https://{S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{object_key}"
+        
+        print(f"Successfully uploaded to S3: {s3_url}")
+        return s3_url
+    
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
+        return file_path  # Return the local path as fallback 
