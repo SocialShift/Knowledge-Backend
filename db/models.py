@@ -253,6 +253,8 @@ class Profile(Base):
     referral_code = Column(String(6), nullable=True)
     total_referrals= Column(Integer, default=0, nullable=True)
 
+    is_premium= Column(Boolean, default=False)
+    badges= Column(JSON, nullable=True)
     current_login_streak = Column(Integer, default=0)
     max_login_streak = Column(Integer, default=0)
     last_login_date = Column(Date, nullable=True)
