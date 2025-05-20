@@ -246,6 +246,7 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
             main_character = {
                 "id": character.id,
                 "avatar_url": character.avatar_url,
+                "name": character.name,
                 "persona": character.persona,
                 "created_at": character.created_at
             }
