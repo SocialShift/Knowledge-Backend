@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType, UserStoryLike, Character
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
+from utils.push_notification import send_otd_notification
 from fastapi.responses import JSONResponse
 from datetime import date, datetime
 from typing import Optional, List
@@ -57,6 +58,10 @@ async def create_otd(
     try:
         db.commit()
         db.refresh(new_otd_obj)
+        try:
+            send_otd_notification(new_otd_obj.title, new_otd_obj.date, new_otd_obj.id)
+        except Exception as e:
+            print(f"Failed to send push notification: {str(e)}")
         return {"id": new_otd_obj.id, "message": "On This Day entry created successfully"}
     except Exception as e:
         db.rollback()

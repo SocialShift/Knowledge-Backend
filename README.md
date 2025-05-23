@@ -45,5 +45,44 @@ S3_BUCKET_NAME=your-bucket-name
 5. Ensure your S3 bucket has public read access if you need direct public access to uploaded files
 
 The application will automatically use S3 for media storage when `S3_ENABLED=true` and fall back to local storage if S3 upload fails. 
+
+## Firebase Push Notifications
+
+The application uses Firebase Cloud Messaging (FCM) to send push notifications to mobile devices.
+
+### Setup Instructions
+
+1. Create a Firebase project at https://console.firebase.google.com/
+2. Add your iOS and Android apps to the Firebase project
+3. Download and integrate the Firebase configuration files into your mobile apps
+4. Get your Firebase Server Key:
+   - In the Firebase Console, go to Project Settings > Cloud Messaging
+   - Copy the "Server key"
+5. Update your `.env` file with:
+```
+FIREBASE_SERVER_KEY=your_firebase_server_key_here
+```
+
+### Mobile App Integration
+
+To receive push notifications, your mobile app needs to:
+
+1. Initialize Firebase in your app
+2. Subscribe to the topic "otd_updates" using FCM's topic subscription:
+```
+// iOS/Swift
+Messaging.messaging().subscribe(toTopic: "otd_updates")
+
+// Android/Kotlin
+FirebaseMessaging.getInstance().subscribeToTopic("otd_updates")
+```
+
+### Testing Push Notifications
+
+After setup, push notifications will be automatically sent when:
+- A new "On This Day" entry is created
+
+To test push notifications manually, you can use the Firebase Console's "Cloud Messaging" feature to send test messages to your devices.
+
 alembic revision --autogenerate -m "your migration message"
 alembic upgrade head
