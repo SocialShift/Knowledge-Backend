@@ -1,11 +1,22 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, status, UploadFile, File, Form
-from db.models import get_db, User, Profile, QuizAttempt, UserFollow
+from db.models import get_db, User, Profile, QuizAttempt, UserFollow, VerificationOTP
 from sqlalchemy.orm import Session
-from schemas.users import UserCreateModel, LoginModel, ProfileUpdate, UserEmailUpdate, UserPasswordChange, FollowRequest, FollowerResponse
+from schemas.users import (
+    UserCreateModel, 
+    LoginModel, 
+    ProfileUpdate, 
+    UserEmailUpdate, 
+    UserPasswordChange, 
+    FollowRequest, 
+    FollowerResponse,
+    EmailVerificationRequest,
+    ResendVerificationRequest
+)
 from fastapi.responses import JSONResponse
 from db.models import pwd_context, Feedback
 from utils.auth import get_current_user, create_session, end_session
 from utils.file_handler import save_image, delete_file
+from utils.email_sender import generate_otp, send_verification_email
 import json
 from datetime import datetime, date, timedelta
 from sqlalchemy import desc
@@ -58,17 +69,89 @@ async def create_user(request: Request, data: UserCreateModel, db: Session = Dep
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Generate and send verification email
+    await send_verification_otp(new_user.email, db)
     # Create session for the new user
     create_session(request, new_user)
     
     return JSONResponse({
-        'detail': 'New User created',
+        'detail': 'User created. Please check your email for verification code.',
         'user': {
             'id': new_user.id,
             'email': new_user.email,
-            'username': new_user.username
+            'username': new_user.username,
+            'is_verified': new_user.is_verified
         }
     }, status_code=status.HTTP_201_CREATED)
+
+async def send_verification_otp(email: str, db: Session):
+    """Generate and send a verification OTP to the user's email"""
+    
+    # Generate a 6-digit OTP
+    otp = generate_otp(6)
+    
+    # Set expiration time (10 minutes from now)
+    expires_at = datetime.now() + timedelta(minutes=10)
+    
+    # Create OTP record in database
+    verification_otp = VerificationOTP(
+        email=email,
+        otp=otp,
+        expires_at=expires_at
+    )
+    
+    # Save to database
+    db.add(verification_otp)
+    try:
+        db.commit()
+        # Send email with OTP
+        send_verification_email(email, otp)
+    except Exception as e:
+        db.rollback()
+        print(f"Error sending verification email: {e}")
+
+@router.post('/verify-email')
+async def verify_email(data: EmailVerificationRequest, db: Session = Depends(get_db)):
+    """Verify user's email using the provided OTP"""
+    
+    # Find the latest OTP for this email that hasn't been used
+    verification = db.query(VerificationOTP).filter(
+        VerificationOTP.email == data.email,
+        VerificationOTP.is_used == False
+    ).order_by(desc(VerificationOTP.created_at)).first()
+    
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No verification code found for this email"
+        )
+    
+    if not verification.is_valid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code has expired. Please request a new one."
+        )
+    
+    if verification.otp != data.otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code"
+        )
+    
+    # Mark OTP as used
+    verification.mark_as_used()
+    
+    # Update user's verification status
+    user = db.query(User).filter(User.email == data.email).first()
+    if user:
+        user.is_verified = True
+    
+    try:
+        db.commit()
+        return {"message": "Email verified successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete('/delete-user')
 async def delete_user(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

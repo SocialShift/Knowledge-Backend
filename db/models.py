@@ -212,6 +212,7 @@ class User(Base):
     username= Column(String(255), unique=True, nullable=True)
     password= Column(String(255), nullable=False)
     joined_at= Column(DateTime, default=datetime.now())
+    is_verified= Column(Boolean, default=False)
     is_active= Column(Boolean, default=True)
     is_admin= Column(Boolean, default=False)
 
@@ -563,3 +564,21 @@ class StandAloneGameAttempt(Base):
 
     def __repr__(self):
         return f"Attempt on game {self.game_id} by user {self.user_id}"
+
+class VerificationOTP(Base):
+    __tablename__ = 'verification_otps'
+    
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), nullable=False)
+    otp = Column(String(10), nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False)
+    
+    def is_valid(self):
+        """Check if the OTP is still valid (not expired and not used)"""
+        return datetime.now() < self.expires_at and not self.is_used
+    
+    def mark_as_used(self):
+        """Mark this OTP as used"""
+        self.is_used = True

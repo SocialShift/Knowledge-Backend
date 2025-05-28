@@ -82,3 +82,25 @@ class LeaderboardResponseModel(BaseModel):
 
 class FeedbackCreateModel(BaseModel):
     text: str 
+
+class EmailVerificationRequest(BaseModel):
+    email: str
+    otp: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "otp": "123456"
+            }
+        }
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "user@example.com"
+            }
+        } 
