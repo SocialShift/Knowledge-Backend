@@ -22,7 +22,7 @@ client = OpenAI()
 #client = #AzureOpenAI(api_version="2024-12-01-preview",api_key= os.environ['OPENAI_API_KEY'], azure_endpoint="https://beta101.openai.azure.com/")
 
 # Authentication cookie (replace with your actual cookie)
-AUTH_COOKIE= "eyJ1c2VyX2lkIjogMywgImVtYWlsIjogImFAYS5jb20ifQ==.aBT87w.uEannVjFa1ShdgPzIsBXB_zmiyc"
+AUTH_COOKIE= "eyJ1c2VyX2lkIjogMTAsICJlbWFpbCI6ICJ2YW5zaGdlcmE2MEBnbWFpbC5jb20iLCAibGFzdF9zdHJlYWtfY2hlY2siOiAiMjAyNS0wNS0yNSIsICJzdHJlYWtfYm9udXMiOiA1LCAiY3VycmVudF9zdHJlYWsiOiAxfQ==.aDaUXQ.cTcKE7O_CSEKdAkEo2t7HblEumE"
 #BASE_URL= "http://127.0.0.1:8000/api"
 BASE_URL = "https://api.knowhistory.xyz/api"
 
