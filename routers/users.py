@@ -403,6 +403,7 @@ async def get_profile(
         "user": {
             "id": current_user.id,
             "email": current_user.email,
+            "is_verified": current_user.is_verified,
             "is_admin": current_user.is_admin,
             "joined_at": current_user.joined_at
         },
