@@ -51,7 +51,7 @@ pexpect==4.9.0
 pillow==10.4.0
 proglog==0.1.11
 prompt_toolkit==3.0.50
-psycopg2==2.9.10
+#psycopg2==2.9.10
 ptyprocess==0.7.0
 pure_eval==0.2.3
 pydantic==2.10.6
