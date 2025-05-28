@@ -907,3 +907,37 @@ async def search_users(
         "limit": limit,
         "query": query
     }
+
+@router.post('/resend-verification')
+async def resend_verification(data: ResendVerificationRequest, db: Session = Depends(get_db)):
+    """Resend verification OTP to an existing user's email"""
+    
+    # Find the user by email
+    user = db.query(User).filter(User.email == data.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found with this email"
+        )
+    
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
+    
+    # Send verification OTP
+    await send_verification_otp(user.email, db)
+    
+    return {"message": "Verification code sent. Please check your email."}
+
+@router.get("/verification-status")
+async def check_verification_status(current_user: User = Depends(get_current_user)):
+    """Check if the current user's email is verified"""
+    
+    return {
+        "is_verified": current_user.is_verified,
+        "email": current_user.email,
+        "message": "Your email is verified." if current_user.is_verified else "Your email is not verified. Please verify your email."
+    }
