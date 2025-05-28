@@ -21,6 +21,7 @@ executing==2.2.0
 fastapi==0.115.8
 fastapi-cli==0.0.7
 ffmpeg==1.4
+ffmpeg-python==0.2.0
 firebase-admin==6.5.0
 h11==0.14.0
 httpcore==1.0.7
@@ -46,7 +47,6 @@ numpy==2.2.4
 openai==1.69.0
 parso==0.8.4
 passlib==1.7.4
-pendulum==3.0.0
 pexpect==4.9.0
 pillow==10.4.0
 proglog==0.1.11
