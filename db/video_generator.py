@@ -78,7 +78,7 @@ def generate_audio(client, file_path, prompt, tone="speak in a positive tone"):
         print(f"Error generating audio: {e}")
         # Create an empty audio file
         empty_audio = AudioSegment.silent(duration=3000)  # 3 seconds of silence
-        empty_audio.export(file_path, format="mp3")
+        empty_audio.export(file_path, format="aac")
         return 3000  # Return 3000ms
 
 def save_image(image_url, output_path):
@@ -194,7 +194,7 @@ def create_video(client, topic, output_dir):
         audio_paths = []
         durations = []
         for step in story.steps:
-            audio_path = story_dir / f"step-{step.number_id}.mp3"
+            audio_path = story_dir / f"step-{step.number_id}.aac"
             duration = generate_audio(client, audio_path, step.text, step.tone)
             audio_paths.append(str(audio_path))
             durations.append(duration)
@@ -216,7 +216,7 @@ def create_video(client, topic, output_dir):
                     # Create a silent audio clip if it doesn't exist
                     from pydub import AudioSegment
                     silent = AudioSegment.silent(duration=3000)
-                    silent.export(audio_paths[i], format="mp3")
+                    silent.export(audio_paths[i], format="aac")
                     duration_sec = 3
                 
                 # Create image clip with audio
@@ -243,7 +243,7 @@ def create_video(client, topic, output_dir):
         # Concatenate clips and create final video
         final_video = concatenate_videoclips(video_clips)
         video_output_path = story_dir / f"{story_id}.mp4"
-        final_video.write_videofile(str(video_output_path), fps=24, codec="libx264")
+        final_video.write_videofile(str(video_output_path), fps=24, codec="libx264", audio_codec="aac")
         
         return {
             "story_id": story_id,
@@ -270,7 +270,7 @@ def create_video(client, topic, output_dir):
         
         img_clip = ImageClip(str(fallback_path)).with_duration(5)
         video_output_path = story_dir / f"{story_id}.mp4"
-        img_clip.write_videofile(str(video_output_path), fps=24, codec="libx264")
+        img_clip.write_videofile(str(video_output_path), fps=24, codec="libx264", audio_codec="aac")
         
         return {
             "story_id": story_id,
