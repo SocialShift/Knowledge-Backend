@@ -8,7 +8,7 @@ from schemas.stories_timelines import (
 from schemas.users import LeaderboardEntryModel, LeaderboardResponseModel
 from db.models import get_db
 from sqlalchemy.orm import Session
-from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType, UserStoryLike, Character
+from db.models import User, Timeline, Story, OnThisDay, Timestamp, Quiz, Question, Option, Profile, QuizAttempt, StoryType, UserStoryLike, Character, UserStoryView, UserTimelineView, UserTimelineBookmark
 from utils.auth import get_current_user, get_admin_user
 from utils.file_handler import save_image, save_video, delete_file
 from utils.push_notification import send_otd_notification
@@ -239,14 +239,39 @@ async def create_timeline(
 
 @router.get('/timeline/{timeline_id}')
 async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    timeline_obj= db.query(Timeline).filter(Timeline.id == timeline_id).first()
-    if not timeline_obj:
-        raise HTTPException(detail="TimeLine Not Found", status_code=status.HTTP_404_NOT_FOUND)
+    timeline = db.query(Timeline).filter(Timeline.id == timeline_id).first()
+    
+    if not timeline:
+        raise HTTPException(detail="Timeline not found", status_code=status.HTTP_404_NOT_FOUND)
+    
+    # Track user's view of this timeline
+    user_timeline_view = db.query(UserTimelineView).filter(
+        UserTimelineView.user_id == current_user.id,
+        UserTimelineView.timeline_id == timeline_id
+    ).first()
+    
+    if not user_timeline_view:
+        # Create new view record
+        user_timeline_view = UserTimelineView(
+            user_id=current_user.id,
+            timeline_id=timeline_id,
+            is_seen=True,
+            viewed_at=datetime.utcnow()
+        )
+        db.add(user_timeline_view)
+    
+    # Check if timeline is bookmarked
+    bookmark = db.query(UserTimelineBookmark).filter(
+        UserTimelineBookmark.user_id == current_user.id,
+        UserTimelineBookmark.timeline_id == timeline_id
+    ).first()
+    
+    db.commit()  # Commit the changes to the database
     
     # Get main character info if exists
     main_character = None
-    if timeline_obj.main_character_id:
-        character = db.query(Character).filter(Character.id == timeline_obj.main_character_id).first()
+    if timeline.main_character_id:
+        character = db.query(Character).filter(Character.id == timeline.main_character_id).first()
         if character:
             main_character = {
                 "id": character.id,
@@ -258,25 +283,43 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
     
     # Create response with timeline and main character
     response = {
-        "id": timeline_obj.id,
-        "title": timeline_obj.title,
-        "year_range": timeline_obj.year_range,
-        "overview": timeline_obj.overview,
-        "thumbnail_url": timeline_obj.thumbnail_url,
-        "created_at": timeline_obj.created_at,
+        "id": timeline.id,
+        "title": timeline.title,
+        "year_range": timeline.year_range,
+        "overview": timeline.overview,
+        "thumbnail_url": timeline.thumbnail_url,
+        "created_at": timeline.created_at,
         "main_character": main_character,
-        "categories": timeline_obj.categories
+        "categories": timeline.categories,
+        "is_seen": True,  # Always true for the current timeline
+        "bookmarked": bookmark is not None
     }
     
     return response
 
 @router.get('/list/timelines')
-async def get_timelines(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    timelines = db.query(Timeline).all()
+async def get_all_timelines(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
+    all_timelines = db.query(Timeline).all()
     
-    # Convert each timeline to a dictionary with categories included
-    result = []
-    for timeline in timelines:
+    # Get all timeline views for the current user
+    user_timeline_views = db.query(UserTimelineView).filter(
+        UserTimelineView.user_id == current_user.id
+    ).all()
+    
+    # Create a set of timeline IDs that the user has viewed
+    viewed_timeline_ids = {view.timeline_id for view in user_timeline_views}
+    
+    # Get all bookmarked timelines for the current user
+    user_timeline_bookmarks = db.query(UserTimelineBookmark).filter(
+        UserTimelineBookmark.user_id == current_user.id
+    ).all()
+    
+    # Create a set of timeline IDs that the user has bookmarked
+    bookmarked_timeline_ids = {bookmark.timeline_id for bookmark in user_timeline_bookmarks}
+    
+    # Add the is_seen flag to each timeline
+    timelines_with_status = []
+    for timeline in all_timelines:
         # Get main character info if exists
         main_character = None
         if timeline.main_character_id:
@@ -285,12 +328,12 @@ async def get_timelines(db: Session= Depends(get_db), current_user: User= Depend
                 main_character = {
                     "id": character.id,
                     "avatar_url": character.avatar_url,
+                    "name": character.name,
                     "persona": character.persona,
                     "created_at": character.created_at
                 }
         
-        # Create response with timeline and main character
-        timeline_dict = {
+        timelines_with_status.append({
             "id": timeline.id,
             "title": timeline.title,
             "year_range": timeline.year_range,
@@ -298,11 +341,12 @@ async def get_timelines(db: Session= Depends(get_db), current_user: User= Depend
             "thumbnail_url": timeline.thumbnail_url,
             "created_at": timeline.created_at,
             "main_character": main_character,
-            "categories": timeline.categories
-        }
-        result.append(timeline_dict)
+            "categories": timeline.categories,
+            "is_seen": timeline.id in viewed_timeline_ids,
+            "bookmarked": timeline.id in bookmarked_timeline_ids
+        })
     
-    return result
+    return timelines_with_status
 
 @router.get('/timelines/filter')
 async def filter_timelines(
@@ -646,7 +690,29 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
         raise HTTPException(detail="Story not found", status_code=status.HTTP_404_NOT_FOUND)
     # Increment the view count
     story.views += 1
-    db.commit()  # Commit the change to the database
+    
+    # Track user's view of this story
+    user_story_view = db.query(UserStoryView).filter(
+        UserStoryView.user_id == current_user.id,
+        UserStoryView.story_id == story_id
+    ).first()
+    
+    if not user_story_view:
+        # Create new view record
+        user_story_view = UserStoryView(
+            user_id=current_user.id,
+            story_id=story_id,
+            is_seen=True,
+            viewed_at=datetime.utcnow()
+        )
+        db.add(user_story_view)
+        
+        # Add points for first-time viewing a story (if points system is in use)
+        profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
+        if profile:
+            profile.points += 5  # 5 points for first time viewing a story
+    
+    db.commit()  # Commit the changes to the database
     
     # Get timestamps for this story
     timestamps = db.query(Timestamp).filter(Timestamp.story_id == story_id).all()
@@ -664,7 +730,8 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
             "story_type": story.story_type,
             "views": story.views,
             "likes": story.likes,
-            "created_at": story.created_at
+            "created_at": story.created_at,
+            "is_seen": True  # Always true for the current story
         },
         "timestamps": [
             {
@@ -682,7 +749,15 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
 async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
     all_stories = db.query(Story).all()
     
-    # Create a list of stories with their timestamps
+    # Get all story views for the current user
+    user_story_views = db.query(UserStoryView).filter(
+        UserStoryView.user_id == current_user.id
+    ).all()
+    
+    # Create a set of story IDs that the user has viewed
+    viewed_story_ids = {view.story_id for view in user_story_views}
+    
+    # Create a list of stories with their timestamps and view status
     stories_with_timestamps = []
     for story in all_stories:
         timestamps = db.query(Timestamp).filter(Timestamp.story_id == story.id).all()
@@ -698,7 +773,8 @@ async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depe
                 "story_type": story.story_type,
                 "views": story.views,
                 "likes": story.likes,
-                "created_at": story.created_at
+                "created_at": story.created_at,
+                "is_seen": story.id in viewed_story_ids
             },
             "timestamps": [
                 {
@@ -714,8 +790,35 @@ async def get_all_stories(db: Session= Depends(get_db), current_user: User= Depe
 
 @router.get('/timeline/{timeline_id}/stories')
 async def get_stories_of_timeline(timeline_id: int, db: Session= Depends(get_db), current_user: User= Depends(get_current_user)):
-    get_stories= db.query(Story).filter(Story.timeline_id == timeline_id).all()
-    return get_stories
+    stories = db.query(Story).filter(Story.timeline_id == timeline_id).all()
+    
+    # Get all story views for the current user
+    user_story_views = db.query(UserStoryView).filter(
+        UserStoryView.user_id == current_user.id
+    ).all()
+    
+    # Create a set of story IDs that the user has viewed
+    viewed_story_ids = {view.story_id for view in user_story_views}
+    
+    # Add is_seen status to each story
+    stories_with_status = []
+    for story in stories:
+        stories_with_status.append({
+            "id": story.id,
+            "title": story.title,
+            "desc": story.desc,
+            "thumbnail_url": story.thumbnail_url,
+            "video_url": story.video_url,
+            "timeline_id": story.timeline_id,
+            "story_date": story.story_date,
+            "story_type": story.story_type,
+            "views": story.views,
+            "likes": story.likes,
+            "created_at": story.created_at,
+            "is_seen": story.id in viewed_story_ids
+        })
+    
+    return stories_with_status
 
 @router.patch('/story/update/{story_id}')
 async def update_story(
@@ -1449,3 +1552,123 @@ async def delete_character(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post('/timeline/{timeline_id}/bookmark')
+async def bookmark_timeline(
+    timeline_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Bookmark or unbookmark a timeline"""
+    # Check if timeline exists
+    timeline = db.query(Timeline).filter(Timeline.id == timeline_id).first()
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Timeline not found")
+    
+    # Check if timeline is already bookmarked
+    bookmark = db.query(UserTimelineBookmark).filter(
+        UserTimelineBookmark.user_id == current_user.id,
+        UserTimelineBookmark.timeline_id == timeline_id
+    ).first()
+    
+    if bookmark:
+        # Unbookmark: remove the bookmark
+        db.delete(bookmark)
+        db.commit()
+        return {"timeline_id": timeline_id, "bookmarked": False}
+    else:
+        # Bookmark: create new bookmark
+        new_bookmark = UserTimelineBookmark(
+            user_id=current_user.id,
+            timeline_id=timeline_id
+        )
+        db.add(new_bookmark)
+        db.commit()
+        return {"timeline_id": timeline_id, "bookmarked": True}
+
+@router.get('/timeline/{timeline_id}/bookmarked')
+async def check_timeline_bookmarked(
+    timeline_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Check if the current user has bookmarked a timeline"""
+    # Check if timeline exists
+    timeline = db.query(Timeline).filter(Timeline.id == timeline_id).first()
+    if not timeline:
+        raise HTTPException(status_code=404, detail="Timeline not found")
+    
+    # Check if timeline is bookmarked
+    bookmark = db.query(UserTimelineBookmark).filter(
+        UserTimelineBookmark.user_id == current_user.id,
+        UserTimelineBookmark.timeline_id == timeline_id
+    ).first()
+    
+    return {"timeline_id": timeline_id, "bookmarked": bookmark is not None}
+
+@router.get('/user/bookmarked-timelines')
+async def get_bookmarked_timelines(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all timelines bookmarked by the current user"""
+    # Get all bookmarked timeline IDs for the user
+    bookmarks = db.query(UserTimelineBookmark).filter(
+        UserTimelineBookmark.user_id == current_user.id
+    ).all()
+    
+    # Create a list of bookmarked timeline IDs
+    bookmarked_timeline_ids = [bookmark.timeline_id for bookmark in bookmarks]
+    
+    if not bookmarked_timeline_ids:
+        return []
+    
+    # Get the timeline details for bookmarked timelines
+    bookmarked_timelines = db.query(Timeline).filter(
+        Timeline.id.in_(bookmarked_timeline_ids)
+    ).all()
+    
+    # Get all timeline views for the current user
+    user_timeline_views = db.query(UserTimelineView).filter(
+        UserTimelineView.user_id == current_user.id
+    ).all()
+    
+    # Create a set of viewed timeline IDs for efficient lookup
+    viewed_timeline_ids = {view.timeline_id for view in user_timeline_views}
+    
+    # Add viewed status to each timeline
+    result = []
+    for timeline in bookmarked_timelines:
+        # Get main character info if exists
+        main_character = None
+        if timeline.main_character_id:
+            character = db.query(Character).filter(Character.id == timeline.main_character_id).first()
+            if character:
+                main_character = {
+                    "id": character.id,
+                    "avatar_url": character.avatar_url,
+                    "name": character.name,
+                    "persona": character.persona,
+                    "created_at": character.created_at
+                }
+                
+        # Find the bookmark timestamp
+        bookmark = next((b for b in bookmarks if b.timeline_id == timeline.id), None)
+        
+        result.append({
+            "id": timeline.id,
+            "title": timeline.title,
+            "year_range": timeline.year_range,
+            "overview": timeline.overview,
+            "thumbnail_url": timeline.thumbnail_url,
+            "created_at": timeline.created_at,
+            "main_character": main_character,
+            "categories": timeline.categories,
+            "is_seen": timeline.id in viewed_timeline_ids,
+            "bookmarked_at": bookmark.bookmarked_at if bookmark else None
+        })
+    
+    # Sort by most recently bookmarked
+    result.sort(key=lambda x: x.get("bookmarked_at", datetime.min), reverse=True)
+    
+    return result

@@ -1,6 +1,6 @@
 from sqladmin import ModelView
 from wtforms import SelectMultipleField
-from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes, StandAloneGameAttempt
+from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, UserStoryView, UserTimelineView, UserTimelineBookmark, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes, StandAloneGameAttempt
 
 class UserAdmin(ModelView, model=User):
     column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin, User.username, User.is_verified]
@@ -162,6 +162,25 @@ class UserStoryLikeAdmin(ModelView, model=UserStoryLike):
         UserStoryLike.story_id: lambda m, a: f"{Story.query.get(m.story_id).title}" if Story.query.get(m.story_id) else f"Story #{m.story_id}"
     }
 
+class UserStoryViewAdmin(ModelView, model=UserStoryView):
+    column_list = [UserStoryView.id, UserStoryView.user_id, UserStoryView.story_id, UserStoryView.is_seen, UserStoryView.viewed_at]
+    name = "User Story View"
+    name_plural = "User Story Views"
+    icon = "fa-solid fa-eye"
+    
+
+class UserTimelineViewAdmin(ModelView, model=UserTimelineView):
+    column_list = [UserTimelineView.id, UserTimelineView.user_id, UserTimelineView.timeline_id, UserTimelineView.is_seen, UserTimelineView.viewed_at]
+    name = "User Timeline View"
+    name_plural = "User Timeline Views"
+    icon = "fa-solid fa-clock-rotate-left"
+
+class UserTimelineBookmarkAdmin(ModelView, model=UserTimelineBookmark):
+    column_list = [UserTimelineBookmark.id, UserTimelineBookmark.user_id, UserTimelineBookmark.timeline_id, UserTimelineBookmark.bookmarked_at]
+    name = "Timeline Bookmark"
+    name_plural = "Timeline Bookmarks"
+    icon = "fa-solid fa-bookmark"
+    
 class TimestampAdmin(ModelView, model=Timestamp):
     column_list = [Timestamp.id, Timestamp.story_id, Timestamp.time_sec, Timestamp.label]
     name = "Timestamp"

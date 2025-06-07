@@ -30,7 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(HTTPSRedirectMiddleware)
+#app.add_middleware(HTTPSRedirectMiddleware)
 
 
 static_path = Path("static")
@@ -79,6 +79,9 @@ from db.admin import (
     OnThisDayAdmin,
     QuizAttemptAdmin,
     UserStoryLikeAdmin,
+    UserStoryViewAdmin,
+    UserTimelineViewAdmin,
+    UserTimelineBookmarkAdmin,
     TimestampAdmin,
     FeedbackAdmin,
     StandAloneGameQuestionAdmin,
@@ -97,6 +100,9 @@ admin.add_view(CharacterAdmin)
 admin.add_view(OnThisDayAdmin)
 admin.add_view(QuizAttemptAdmin)
 admin.add_view(UserStoryLikeAdmin)
+admin.add_view(UserStoryViewAdmin)
+admin.add_view(UserTimelineViewAdmin)
+admin.add_view(UserTimelineBookmarkAdmin)
 admin.add_view(TimestampAdmin)
 admin.add_view(FeedbackAdmin)
 admin.add_view(StandAloneGameQuestionAdmin)

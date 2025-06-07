@@ -437,6 +437,53 @@ class UserStoryLike(Base):
         UniqueConstraint('user_id', 'story_id', name='unique_user_story_like'),
     )
 
+class UserStoryView(Base):
+    __tablename__ = "user_story_views"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    story_id = Column(Integer, ForeignKey("stories.id", ondelete="CASCADE"))
+    is_seen = Column(Boolean, default=True)
+    viewed_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'story_id', name='unique_user_story_view'),
+    )
+    
+    def __repr__(self):
+        return f"UserStoryView: User {self.user_id} viewed Story {self.story_id}"
+
+class UserTimelineView(Base):
+    __tablename__ = "user_timeline_views"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    timeline_id = Column(Integer, ForeignKey("timelines.id", ondelete="CASCADE"))
+    is_seen = Column(Boolean, default=True)
+    viewed_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'timeline_id', name='unique_user_timeline_view'),
+    )
+    
+    def __repr__(self):
+        return f"UserTimelineView: User {self.user_id} viewed Timeline {self.timeline_id}"
+
+class UserTimelineBookmark(Base):
+    __tablename__ = "user_timeline_bookmarks"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    timeline_id = Column(Integer, ForeignKey("timelines.id", ondelete="CASCADE"))
+    bookmarked_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'timeline_id', name='unique_user_timeline_bookmark'),
+    )
+    
+    def __repr__(self):
+        return f"UserTimelineBookmark: User {self.user_id} bookmarked Timeline {self.timeline_id}"
+
 class Community(Base):
     __tablename__= "communities"
 
