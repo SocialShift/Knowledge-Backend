@@ -34,15 +34,15 @@ async def create_user(request: Request, data: UserCreateModel, db: Session = Dep
 
 
     elif db.query(User).filter(User.email == data.email).first():
-        raise HTTPException(
+        return JSONResponse(
+            {"detail":"Email already exists"},
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already exists"
         )
     
     elif len(data.password) < 8:
-        raise HTTPException(
+        return JSONResponse(
+            {"detail": "Password must be at least 8 characters long"},
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long"
         )
     # Your success logic here
     new_user= User(
@@ -167,9 +167,10 @@ async def login(request: Request, data: LoginModel, db: Session = Depends(get_db
     user = db.query(User).filter(User.email == data.email).first()
     
     if not user or not user.verify_password(data.password):
-        return {
-            "detail": "Invalid email or password"
-            }
+        return JSONResponse(
+            {'detail': "Invalid or password is invalid"},
+            status_code= status.HTTP_401_UNAUTHORIZED
+            )
     
     # Create session
     create_session(request, user)
