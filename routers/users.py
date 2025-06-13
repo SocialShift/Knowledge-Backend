@@ -167,10 +167,9 @@ async def login(request: Request, data: LoginModel, db: Session = Depends(get_db
     user = db.query(User).filter(User.email == data.email).first()
     
     if not user or not user.verify_password(data.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
+        return {
+            "detail": "Invalid email or password"
+            }
     
     # Create session
     create_session(request, user)
