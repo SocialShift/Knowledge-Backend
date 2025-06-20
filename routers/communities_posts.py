@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
 
-from db.models import Community, Post, Comment, User
+from db.models import Community, Post, Comment, User, CommunityMember
 from schemas.communities_posts import (
     Community as CommunitySchema,
     CommunityCreate, 
     CommunityUpdate,
+    CommunityWithMemberCount,
     Post as PostSchema,
     PostCreate,
     PostUpdate,
@@ -16,7 +17,9 @@ from schemas.communities_posts import (
     CommentCreate,
     CommentUpdate,
     PostVote,
-    CommentVote
+    CommentVote,
+    CommunityMember as CommunityMemberSchema,
+    CommunityMembershipResponse
 )
 from db.models import get_db
 from utils.auth import get_current_user
@@ -75,26 +78,83 @@ async def create_community(
             delete_file(icon_url)
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=List[CommunitySchema])
+@router.get("/", response_model=List[CommunityWithMemberCount])
 def get_communities(
     skip: int = 0, 
     limit: int = 10,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Get all communities with pagination"""
+    """Get all communities with pagination, member count, and membership status"""
     communities = db.query(Community).offset(skip).limit(limit).all()
-    return communities
+    
+    result = []
+    for community in communities:
+        # Count members
+        member_count = db.query(CommunityMember).filter(
+            CommunityMember.community_id == community.id
+        ).count()
+        
+        # Check if current user is a member
+        is_member = db.query(CommunityMember).filter(
+            CommunityMember.community_id == community.id,
+            CommunityMember.user_id == current_user.id
+        ).first() is not None
+        
+        # Create enhanced community object
+        community_dict = {
+            "id": community.id,
+            "name": community.name,
+            "description": community.description,
+            "topics": community.topics,
+            "banner_url": community.banner_url,
+            "icon_url": community.icon_url,
+            "created_at": community.created_at,
+            "created_by": community.created_by,
+            "member_count": member_count,
+            "is_member": is_member
+        }
+        result.append(CommunityWithMemberCount(**community_dict))
+    
+    return result
 
-@router.get("/{community_id}", response_model=CommunitySchema)
+@router.get("/{community_id}", response_model=CommunityWithMemberCount)
 def get_community(
     community_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a specific community by ID"""
+    """Get a specific community by ID with member count and membership status"""
     community = db.query(Community).filter(Community.id == community_id).first()
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
-    return community
+    
+    # Count members
+    member_count = db.query(CommunityMember).filter(
+        CommunityMember.community_id == community.id
+    ).count()
+    
+    # Check if current user is a member
+    is_member = db.query(CommunityMember).filter(
+        CommunityMember.community_id == community.id,
+        CommunityMember.user_id == current_user.id
+    ).first() is not None
+    
+    # Create enhanced community object
+    community_dict = {
+        "id": community.id,
+        "name": community.name,
+        "description": community.description,
+        "topics": community.topics,
+        "banner_url": community.banner_url,
+        "icon_url": community.icon_url,
+        "created_at": community.created_at,
+        "created_by": community.created_by,
+        "member_count": member_count,
+        "is_member": is_member
+    }
+    
+    return CommunityWithMemberCount(**community_dict)
 
 @router.put("/{community_id}", response_model=CommunitySchema)
 async def update_community(
@@ -200,6 +260,149 @@ async def delete_community(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+# Community membership endpoints
+@router.post("/{community_id}/join", response_model=CommunityMembershipResponse)
+def join_community(
+    community_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Join a community"""
+    # Check if community exists
+    community = db.query(Community).filter(Community.id == community_id).first()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    
+    # Check if user is already a member
+    existing_membership = db.query(CommunityMember).filter(
+        CommunityMember.user_id == current_user.id,
+        CommunityMember.community_id == community_id
+    ).first()
+    
+    if existing_membership:
+        return CommunityMembershipResponse(
+            message="You are already a member of this community",
+            is_member=True
+        )
+    
+    # Create new membership
+    new_membership = CommunityMember(
+        user_id=current_user.id,
+        community_id=community_id
+    )
+    
+    db.add(new_membership)
+    try:
+        db.commit()
+        return CommunityMembershipResponse(
+            message="Successfully joined the community",
+            is_member=True
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/{community_id}/leave", response_model=CommunityMembershipResponse)
+def leave_community(
+    community_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Leave a community"""
+    # Check if community exists
+    community = db.query(Community).filter(Community.id == community_id).first()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    
+    # Check if user is a member
+    membership = db.query(CommunityMember).filter(
+        CommunityMember.user_id == current_user.id,
+        CommunityMember.community_id == community_id
+    ).first()
+    
+    if not membership:
+        return CommunityMembershipResponse(
+            message="You are not a member of this community",
+            is_member=False
+        )
+    
+    # Remove membership
+    db.delete(membership)
+    try:
+        db.commit()
+        return CommunityMembershipResponse(
+            message="Successfully left the community",
+            is_member=False
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{community_id}/members", response_model=List[CommunityMemberSchema])
+def get_community_members(
+    community_id: int,
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """Get all members of a community"""
+    # Check if community exists
+    community = db.query(Community).filter(Community.id == community_id).first()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    
+    members = db.query(CommunityMember).filter(
+        CommunityMember.community_id == community_id
+    ).offset(skip).limit(limit).all()
+    
+    return members
+
+@router.get("/{community_id}/membership-status", response_model=CommunityMembershipResponse)
+def get_membership_status(
+    community_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Check if current user is a member of the community"""
+    # Check if community exists
+    community = db.query(Community).filter(Community.id == community_id).first()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    
+    # Check membership
+    membership = db.query(CommunityMember).filter(
+        CommunityMember.user_id == current_user.id,
+        CommunityMember.community_id == community_id
+    ).first()
+    
+    is_member = membership is not None
+    message = "You are a member of this community" if is_member else "You are not a member of this community"
+    
+    return CommunityMembershipResponse(
+        message=message,
+        is_member=is_member
+    )
+
+@router.get("/my-communities", response_model=List[CommunitySchema])
+def get_my_communities(
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all communities the current user has joined"""
+    # Get communities where user is a member
+    member_communities = (
+        db.query(Community)
+        .join(CommunityMember)
+        .filter(CommunityMember.user_id == current_user.id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    return member_communities
 
 # Post endpoints
 @router.post("/post/", response_model=PostSchema, status_code=status.HTTP_201_CREATED)

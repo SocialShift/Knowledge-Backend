@@ -29,6 +29,29 @@ class Community(CommunityBase):
     class Config:
         from_attributes = True
 
+class CommunityWithMemberCount(Community):
+    member_count: int
+    is_member: Optional[bool] = None  # Indicates if current user is a member
+    
+    class Config:
+        from_attributes = True
+
+# Community membership schemas
+class CommunityMemberBase(BaseModel):
+    user_id: int
+    community_id: int
+
+class CommunityMember(CommunityMemberBase):
+    id: int
+    joined_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class CommunityMembershipResponse(BaseModel):
+    message: str
+    is_member: bool
+
 # Post schemas
 class PostBase(BaseModel):
     title: str

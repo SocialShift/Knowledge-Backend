@@ -221,6 +221,7 @@ class User(Base):
     
     # Community relationships
     communities = relationship("Community", back_populates="creator", cascade="all, delete-orphan")
+    joined_communities = relationship("CommunityMember", back_populates="user", cascade="all, delete-orphan")
     posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
     comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
     
@@ -484,6 +485,25 @@ class UserTimelineBookmark(Base):
     def __repr__(self):
         return f"UserTimelineBookmark: User {self.user_id} bookmarked Timeline {self.timeline_id}"
 
+# Community Member relationship table
+class CommunityMember(Base):
+    __tablename__ = "community_members"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False)
+    community_id = Column(Integer, ForeignKey('communities.id', ondelete="CASCADE"), nullable=False)
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="joined_communities")
+    community = relationship("Community", back_populates="members")
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'community_id', name='unique_community_membership'),
+    )
+    
+    def __repr__(self):
+        return f"CommunityMember: User {self.user_id} in Community {self.community_id}"
+
 class Community(Base):
     __tablename__= "communities"
 
@@ -499,6 +519,7 @@ class Community(Base):
 
     creator= relationship("User", back_populates="communities")
     posts = relationship("Post", back_populates="community", cascade="all, delete-orphan")
+    members = relationship("CommunityMember", back_populates="community", cascade="all, delete-orphan")
 
     def __repr__(self):
         return self.name
