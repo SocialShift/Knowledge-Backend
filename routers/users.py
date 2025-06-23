@@ -409,6 +409,7 @@ async def get_profile(
         },
         "profile": {
             "id": profile.id,
+            "badges": profile.badges,
             "nickname": profile.nickname,
             "avatar_url": profile.avatar_url,
             "points": profile.points,
