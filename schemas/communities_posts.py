@@ -2,6 +2,30 @@ from pydantic import BaseModel, validator, Field
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from uuid import UUID
+from enum import Enum
+
+# Report enums
+class ReportTypeEnum(str, Enum):
+    COMMUNITY = "community"
+    POST = "post"
+
+class ReportReasonEnum(str, Enum):
+    SPAM = "spam"
+    HARASSMENT = "harassment"
+    HATE_SPEECH = "hate_speech"
+    INAPPROPRIATE_CONTENT = "inappropriate_content"
+    MISINFORMATION = "misinformation"
+    COPYRIGHT_VIOLATION = "copyright_violation"
+    VIOLENCE = "violence"
+    NUDITY_SEXUAL_CONTENT = "nudity_sexual_content"
+    ILLEGAL_ACTIVITIES = "illegal_activities"
+    OTHER = "other"
+
+class ReportStatusEnum(str, Enum):
+    PENDING = "pending"
+    UNDER_REVIEW = "under_review"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
 
 # Community schemas
 class CommunityBase(BaseModel):
@@ -118,3 +142,41 @@ class PostVote(VoteBase):
 
 class CommentVote(VoteBase):
     comment_id: int
+
+# Report schemas
+class ReportBase(BaseModel):
+    report_type: ReportTypeEnum
+    reported_item_id: int
+    reason: ReportReasonEnum
+    description: Optional[str] = None
+
+class ReportCreate(ReportBase):
+    pass
+
+class ReportUpdate(BaseModel):
+    status: Optional[ReportStatusEnum] = None
+    admin_notes: Optional[str] = None
+
+class Report(ReportBase):
+    id: int
+    reporter_id: int
+    status: ReportStatusEnum
+    admin_notes: Optional[str] = None
+    created_at: datetime
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+class ReportResponse(BaseModel):
+    message: str
+    report_id: int
+
+class ReportWithDetails(Report):
+    """Report with additional details for admin view"""
+    reporter_email: Optional[str] = None  # For admin purposes
+    reported_item_title: Optional[str] = None  # Title of community/post
+    
+    class Config:
+        from_attributes = True

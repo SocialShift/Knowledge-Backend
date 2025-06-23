@@ -583,6 +583,28 @@ class GameTypes(enum.IntEnum):
     GUESS_THE_YEAR= 1
     IMAGE_GUESS= 2
     FILL_IN_THE_BLANK= 3
+
+class ReportType(str, enum.Enum):
+    COMMUNITY = "community"
+    POST = "post"
+
+class ReportReason(str, enum.Enum):
+    SPAM = "spam"
+    HARASSMENT = "harassment"
+    HATE_SPEECH = "hate_speech"
+    INAPPROPRIATE_CONTENT = "inappropriate_content"
+    MISINFORMATION = "misinformation"
+    COPYRIGHT_VIOLATION = "copyright_violation"
+    VIOLENCE = "violence"
+    NUDITY_SEXUAL_CONTENT = "nudity_sexual_content"
+    ILLEGAL_ACTIVITIES = "illegal_activities"
+    OTHER = "other"
+
+class ReportStatus(str, enum.Enum):
+    PENDING = "pending"
+    UNDER_REVIEW = "under_review"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
     
 
 class StandAloneGameQuestion(Base):
@@ -632,6 +654,28 @@ class StandAloneGameAttempt(Base):
 
     def __repr__(self):
         return f"Attempt on game {self.game_id} by user {self.user_id}"
+
+class Report(Base):
+    __tablename__ = "reports"
+    
+    id = Column(Integer, primary_key=True)
+    reporter_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    report_type = Column(Enum(ReportType, native_enum=False), nullable=False)
+    reported_item_id = Column(Integer, nullable=False)  # ID of the reported community or post
+    reason = Column(Enum(ReportReason, native_enum=False), nullable=False)
+    description = Column(Text, nullable=True)  # Optional additional details
+    status = Column(Enum(ReportStatus, native_enum=False), default=ReportStatus.PENDING)
+    admin_notes = Column(Text, nullable=True)  # Notes from admin review
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    reporter = relationship("User", foreign_keys=[reporter_id], backref="submitted_reports")
+    reviewer = relationship("User", foreign_keys=[reviewed_by], backref="reviewed_reports")
+    
+    def __repr__(self):
+        return f"Report {self.id}: {self.report_type} #{self.reported_item_id} by User {self.reporter_id}"
 
 class VerificationOTP(Base):
     __tablename__ = 'verification_otps'

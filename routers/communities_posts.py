@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
+from datetime import datetime
 
-from db.models import Community, Post, Comment, User, CommunityMember
+from db.models import Community, Post, Comment, User, CommunityMember, Report
 from schemas.communities_posts import (
     Community as CommunitySchema,
     CommunityCreate, 
@@ -19,7 +20,14 @@ from schemas.communities_posts import (
     PostVote,
     CommentVote,
     CommunityMember as CommunityMemberSchema,
-    CommunityMembershipResponse
+    CommunityMembershipResponse,
+    ReportCreate,
+    Report as ReportSchema,
+    ReportResponse,
+    ReportWithDetails,
+    ReportUpdate,
+    ReportTypeEnum,
+    ReportReasonEnum
 )
 from db.models import get_db
 from utils.auth import get_current_user
@@ -572,6 +580,181 @@ def vote_post(
     
     db.commit()
     return {"message": "Vote recorded successfully"}
+
+# Report endpoints
+@router.post("/report", response_model=ReportResponse, status_code=status.HTTP_201_CREATED)
+def create_report(
+    report: ReportCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Report a community or post"""
+    
+    # Validate that the reported item exists
+    if report.report_type == ReportTypeEnum.COMMUNITY:
+        item = db.query(Community).filter(Community.id == report.reported_item_id).first()
+        if not item:
+            raise HTTPException(status_code=404, detail="Community not found")
+    elif report.report_type == ReportTypeEnum.POST:
+        item = db.query(Post).filter(Post.id == report.reported_item_id).first()
+        if not item:
+            raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Check if user has already reported this item
+    existing_report = db.query(Report).filter(
+        Report.reporter_id == current_user.id,
+        Report.report_type == report.report_type,
+        Report.reported_item_id == report.reported_item_id
+    ).first()
+    
+    if existing_report:
+        raise HTTPException(
+            status_code=400, 
+            detail="You have already reported this item"
+        )
+    
+    # Create the report
+    db_report = Report(
+        reporter_id=current_user.id,
+        report_type=report.report_type,
+        reported_item_id=report.reported_item_id,
+        reason=report.reason,
+        description=report.description
+    )
+    
+    db.add(db_report)
+    try:
+        db.commit()
+        db.refresh(db_report)
+        return ReportResponse(
+            message="Report submitted successfully. Thank you for helping keep our community safe.",
+            report_id=db_report.id
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/reports", response_model=List[ReportWithDetails])
+def get_reports(
+    skip: int = 0,
+    limit: int = 20,
+    status_filter: Optional[str] = None,
+    report_type_filter: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all reports (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = db.query(Report)
+    
+    # Apply filters
+    if status_filter:
+        query = query.filter(Report.status == status_filter)
+    if report_type_filter:
+        query = query.filter(Report.report_type == report_type_filter)
+    
+    reports = query.order_by(Report.created_at.desc()).offset(skip).limit(limit).all()
+    
+    # Enhance reports with additional details
+    enhanced_reports = []
+    for report in reports:
+        # Get reporter email
+        reporter = db.query(User).filter(User.id == report.reporter_id).first()
+        reporter_email = reporter.email if reporter else None
+        
+        # Get reported item title
+        reported_item_title = None
+        if report.report_type == ReportTypeEnum.COMMUNITY:
+            community = db.query(Community).filter(Community.id == report.reported_item_id).first()
+            reported_item_title = community.name if community else "Deleted Community"
+        elif report.report_type == ReportTypeEnum.POST:
+            post = db.query(Post).filter(Post.id == report.reported_item_id).first()
+            reported_item_title = post.title if post else "Deleted Post"
+        
+        enhanced_report = ReportWithDetails(
+            id=report.id,
+            reporter_id=report.reporter_id,
+            report_type=report.report_type,
+            reported_item_id=report.reported_item_id,
+            reason=report.reason,
+            description=report.description,
+            status=report.status,
+            admin_notes=report.admin_notes,
+            created_at=report.created_at,
+            reviewed_at=report.reviewed_at,
+            reviewed_by=report.reviewed_by,
+            reporter_email=reporter_email,
+            reported_item_title=reported_item_title
+        )
+        enhanced_reports.append(enhanced_report)
+    
+    return enhanced_reports
+
+@router.put("/reports/{report_id}", response_model=ReportSchema)
+def update_report(
+    report_id: int,
+    report_update: ReportUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update a report status (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    db_report = db.query(Report).filter(Report.id == report_id).first()
+    if not db_report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    # Update report fields
+    update_data = report_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_report, key, value)
+    
+    # Set review timestamp and reviewer
+    if report_update.status and db_report.status != "pending":
+        db_report.reviewed_at = datetime.utcnow
+        db_report.reviewed_by = current_user.id
+    
+    try:
+        db.commit()
+        db.refresh(db_report)
+        return db_report
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/reports/my", response_model=List[ReportSchema])
+def get_my_reports(
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get current user's submitted reports"""
+    reports = (
+        db.query(Report)
+        .filter(Report.reporter_id == current_user.id)
+        .order_by(Report.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return reports
+
+@router.get("/reports/reasons", response_model=List[dict])
+def get_report_reasons():
+    """Get all available report reasons"""
+    reasons = []
+    for reason in ReportReasonEnum:
+        # Convert enum values to human-readable format
+        readable_reason = reason.value.replace('_', ' ').title()
+        reasons.append({
+            "value": reason.value,
+            "label": readable_reason
+        })
+    return reasons
 
 # Comment endpoints
 @router.post("/comment/", response_model=CommentSchema, status_code=status.HTTP_201_CREATED)
