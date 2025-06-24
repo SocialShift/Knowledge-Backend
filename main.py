@@ -69,7 +69,8 @@ admin = Admin(app, engine)
 # Register admin views
 from db.admin import (
     UserAdmin, 
-    ProfileAdmin, 
+    ProfileAdmin,
+    UserFollowAdmin,
     TimelineAdmin, 
     StoryAdmin, 
     QuizAdmin,
@@ -84,6 +85,12 @@ from db.admin import (
     UserTimelineBookmarkAdmin,
     TimestampAdmin,
     FeedbackAdmin,
+    CommunityMemberAdmin,
+    CommunityAdmin,
+    PostAdmin,
+    CommentAdmin,
+    ReportAdmin,
+    VerificationOTPAdmin,
     StandAloneGameQuestionAdmin,
     StandAloneGameOptionAdmin,
     StandAloneGameAttemptAdmin
@@ -91,6 +98,7 @@ from db.admin import (
 
 admin.add_view(UserAdmin)
 admin.add_view(ProfileAdmin)
+admin.add_view(UserFollowAdmin)
 admin.add_view(TimelineAdmin)
 admin.add_view(StoryAdmin)
 admin.add_view(QuizAdmin)
@@ -105,6 +113,12 @@ admin.add_view(UserTimelineViewAdmin)
 admin.add_view(UserTimelineBookmarkAdmin)
 admin.add_view(TimestampAdmin)
 admin.add_view(FeedbackAdmin)
+admin.add_view(CommunityMemberAdmin)
+admin.add_view(CommunityAdmin)
+admin.add_view(PostAdmin)
+admin.add_view(CommentAdmin)
+admin.add_view(ReportAdmin)
+admin.add_view(VerificationOTPAdmin)
 admin.add_view(StandAloneGameQuestionAdmin)
 admin.add_view(StandAloneGameOptionAdmin)
 admin.add_view(StandAloneGameAttemptAdmin)

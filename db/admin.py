@@ -1,9 +1,15 @@
 from sqladmin import ModelView
 from wtforms import SelectMultipleField
-from .models import User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, QuizAttempt, UserStoryLike, UserStoryView, UserTimelineView, UserTimelineBookmark, Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, GameTypes, StandAloneGameAttempt
+from .models import (
+    User, Profile, Timeline, Story, Quiz, Question, Option, Character, OnThisDay, 
+    QuizAttempt, UserStoryLike, UserStoryView, UserTimelineView, UserTimelineBookmark, 
+    Timestamp, Feedback, TimelineCategory, StandAloneGameQuestion, StandAloneGameOption, 
+    GameTypes, StandAloneGameAttempt, UserFollow, CommunityMember, Community, Post, 
+    Comment, Report, VerificationOTP, ReportType, ReportReason, ReportStatus
+)
 
 class UserAdmin(ModelView, model=User):
-    column_list = [User.id, User.email, User.password, User.joined_at, User.is_active, User.is_admin, User.username, User.is_verified]
+    column_list = [User.id, User.email, User.username, User.password, User.joined_at, User.is_verified, User.is_active, User.is_admin]
     name = "User"
     name_plural = "Users"
     icon = "fa-solid fa-user"
@@ -18,10 +24,10 @@ class UserAdmin(ModelView, model=User):
     }
 
 class ProfileAdmin(ModelView, model=Profile):
-    column_list = [Profile.id, Profile.user_id, Profile.is_premium, Profile.nickname, Profile.points, Profile.avatar_url, 
-                   Profile.referral_code, Profile.total_referrals, Profile.current_login_streak, 
-                   Profile.max_login_streak, Profile.last_login_date, Profile.language_preference, 
-                   Profile.pronouns, Profile.location, Profile.personalization_questions]
+    column_list = [Profile.id, Profile.user_id, Profile.points, Profile.nickname, Profile.avatar_url, 
+                   Profile.referral_code, Profile.total_referrals, Profile.is_premium, Profile.badges,
+                   Profile.current_login_streak, Profile.max_login_streak, Profile.last_login_date, 
+                   Profile.language_preference, Profile.pronouns, Profile.location, Profile.personalization_questions]
     name = "Profile"
     name_plural = "Profiles"
     icon = "fa-solid fa-address-card"
@@ -29,6 +35,18 @@ class ProfileAdmin(ModelView, model=Profile):
     # Display related user
     column_formatters = {
         Profile.user: lambda m, a: f"{m.user.email}" if m.user else "No user"
+    }
+
+class UserFollowAdmin(ModelView, model=UserFollow):
+    column_list = [UserFollow.id, UserFollow.follower_id, UserFollow.followed_id, UserFollow.created_at]
+    name = "User Follow"
+    name_plural = "User Follows"
+    icon = "fa-solid fa-user-plus"
+    
+    # Display related profiles
+    column_formatters = {
+        UserFollow.follower: lambda m, a: f"{m.follower.nickname}" if m.follower else f"Profile #{m.follower_id}",
+        UserFollow.followed: lambda m, a: f"{m.followed.nickname}" if m.followed else f"Profile #{m.followed_id}"
     }
     
 class TimelineAdmin(ModelView, model=Timeline):
@@ -203,16 +221,92 @@ class FeedbackAdmin(ModelView, model=Feedback):
         Feedback.user: lambda m, a: f"{m.user.email}" if m.user else "None"
     }
 
+class CommunityMemberAdmin(ModelView, model=CommunityMember):
+    column_list = [CommunityMember.id, CommunityMember.user_id, CommunityMember.community_id, CommunityMember.joined_at]
+    name = "Community Member"
+    name_plural = "Community Members"
+    icon = "fa-solid fa-users"
+    
+    # Display related user and community
+    column_formatters = {
+        CommunityMember.user: lambda m, a: f"{m.user.email}" if m.user else f"User #{m.user_id}",
+        CommunityMember.community: lambda m, a: f"{m.community.name}" if m.community else f"Community #{m.community_id}"
+    }
+
+class CommunityAdmin(ModelView, model=Community):
+    column_list = [Community.id, Community.name, Community.description, Community.banner_url, 
+                   Community.icon_url, Community.topics, Community.created_at, Community.created_by]
+    name = "Community"
+    name_plural = "Communities"
+    icon = "fa-solid fa-users"
+    
+    # Display related creator, posts, and members
+    column_formatters = {
+        Community.creator: lambda m, a: f"{m.creator.email}" if m.creator else f"User #{m.created_by}",
+        Community.posts: lambda m, a: f"{len(m.posts)} posts" if m.posts else "No posts",
+        Community.members: lambda m, a: f"{len(m.members)} members" if m.members else "No members",
+        Community.topics: lambda m, a: ", ".join(m.topics) if m.topics else "No topics"
+    }
+
+class PostAdmin(ModelView, model=Post):
+    column_list = [Post.id, Post.community_id, Post.title, Post.body, Post.image_url, 
+                   Post.upvote, Post.downvote, Post.created_at, Post.created_by]
+    name = "Post"
+    name_plural = "Posts"
+    icon = "fa-solid fa-newspaper"
+    
+    # Display related author, community, and comments
+    column_formatters = {
+        Post.author: lambda m, a: f"{m.author.email}" if m.author else f"User #{m.created_by}",
+        Post.community: lambda m, a: f"{m.community.name}" if m.community else f"Community #{m.community_id}",
+        Post.comments: lambda m, a: f"{len(m.comments)} comments" if m.comments else "No comments"
+    }
+
+class CommentAdmin(ModelView, model=Comment):
+    column_list = [Comment.id, Comment.post_id, Comment.commented_by, Comment.comment, 
+                   Comment.upvote, Comment.downvote, Comment.created_at]
+    name = "Comment"
+    name_plural = "Comments"
+    icon = "fa-solid fa-comment"
+    
+    # Display related author and post
+    column_formatters = {
+        Comment.author: lambda m, a: f"{m.author.email}" if m.author else f"User #{m.commented_by}",
+        Comment.post: lambda m, a: f"{m.post.title}" if m.post else f"Post #{m.post_id}"
+    }
+
+class ReportAdmin(ModelView, model=Report):
+    column_list = [Report.id, Report.reporter_id, Report.report_type, Report.reported_item_id, 
+                   Report.reason, Report.description, Report.status, Report.admin_notes, 
+                   Report.created_at, Report.reviewed_at, Report.reviewed_by]
+    name = "Report"
+    name_plural = "Reports"
+    icon = "fa-solid fa-flag"
+    
+    # Display related reporter and reviewer
+    column_formatters = {
+        Report.reporter: lambda m, a: f"{m.reporter.email}" if m.reporter else f"User #{m.reporter_id}",
+        Report.reviewer: lambda m, a: f"{m.reviewer.email}" if m.reviewer else "Not reviewed"
+    }
+
+class VerificationOTPAdmin(ModelView, model=VerificationOTP):
+    column_list = [VerificationOTP.id, VerificationOTP.email, VerificationOTP.otp, 
+                   VerificationOTP.created_at, VerificationOTP.expires_at, VerificationOTP.is_used]
+    name = "Verification OTP"
+    name_plural = "Verification OTPs"
+    icon = "fa-solid fa-key"
+
 class StandAloneGameQuestionAdmin(ModelView, model=StandAloneGameQuestion):
     column_list = [StandAloneGameQuestion.id, StandAloneGameQuestion.game_type, StandAloneGameQuestion.title, 
-                   StandAloneGameQuestion.image_url, StandAloneGameQuestion.created_at]
+                   StandAloneGameQuestion.image_url, StandAloneGameQuestion.story_id, StandAloneGameQuestion.created_at]
     name = "StandAlone Game Question"
     name_plural = "StandAlone Game Questions"
     icon = "fa-solid fa-gamepad"
     
-    # Display related options
+    # Display related options and story
     column_formatters = {
-        StandAloneGameQuestion.options: lambda m, a: f"{len(m.options)} options" if m.options else "No options"
+        StandAloneGameQuestion.options: lambda m, a: f"{len(m.options)} options" if m.options else "No options",
+        StandAloneGameQuestion.story: lambda m, a: f"{m.story.title}" if m.story else "No story"
     }
 
 class StandAloneGameOptionAdmin(ModelView, model=StandAloneGameOption):
@@ -234,3 +328,10 @@ class StandAloneGameAttemptAdmin(ModelView, model=StandAloneGameAttempt):
     name = "StandAlone Game Attempt"
     name_plural = "StandAlone Game Attempts"
     icon = "fa-solid fa-gamepad"
+    
+    # Display related user, game, and selected option
+    column_formatters = {
+        StandAloneGameAttempt.user: lambda m, a: f"{m.user.email}" if m.user else f"User #{m.user_id}",
+        StandAloneGameAttempt.game: lambda m, a: f"{m.game.title}" if m.game else f"Game #{m.game_id}",
+        StandAloneGameAttempt.selected_option: lambda m, a: f"{m.selected_option.text}" if m.selected_option else "No option"
+    }
