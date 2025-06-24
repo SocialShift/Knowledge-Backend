@@ -591,11 +591,11 @@ def create_report(
     """Report a community or post"""
     
     # Validate that the reported item exists
-    if report.report_type == ReportTypeEnum.COMMUNITY:
+    if report.report_type == "community":
         item = db.query(Community).filter(Community.id == report.reported_item_id).first()
         if not item:
             raise HTTPException(status_code=404, detail="Community not found")
-    elif report.report_type == ReportTypeEnum.POST:
+    elif report.report_type == "post":
         item = db.query(Post).filter(Post.id == report.reported_item_id).first()
         if not item:
             raise HTTPException(status_code=404, detail="Post not found")
@@ -666,10 +666,10 @@ def get_reports(
         
         # Get reported item title
         reported_item_title = None
-        if report.report_type == ReportTypeEnum.COMMUNITY:
+        if report.report_type == "community":
             community = db.query(Community).filter(Community.id == report.reported_item_id).first()
             reported_item_title = community.name if community else "Deleted Community"
-        elif report.report_type == ReportTypeEnum.POST:
+        elif report.report_type == "post":
             post = db.query(Post).filter(Post.id == report.reported_item_id).first()
             reported_item_title = post.title if post else "Deleted Post"
         
