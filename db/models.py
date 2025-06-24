@@ -31,30 +31,10 @@ Base = declarative_base()
 
 
 def get_db():
-    db = None
-    retry_count = 0
-    max_retries = 3
-    
-    while retry_count < max_retries:
-        try:
-            db = SessionLocal()
-            yield db
-            break
-        except Exception as e:
-            retry_count += 1
-            if retry_count >= max_retries:
-                # Re-raise the exception if we've exhausted retries
-                raise
-            # Log the error (you may want to implement proper logging)
-            print(f"Database connection error (attempt {retry_count}/{max_retries}): {str(e)}")
-            # If we had a connection but it failed, ensure it's closed
-            if db is not None:
-                try:
-                    db.close()
-                except:
-                    pass
-    
-    if db is not None:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
         db.close()
 
         
