@@ -714,7 +714,7 @@ def update_report(
     
     # Set review timestamp and reviewer
     if report_update.status and db_report.status != "pending":
-        db_report.reviewed_at = datetime.utcnow
+        db_report.reviewed_at = datetime.utcnow()
         db_report.reviewed_by = current_user.id
     
     try:
