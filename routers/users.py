@@ -10,13 +10,15 @@ from schemas.users import (
     FollowRequest, 
     FollowerResponse,
     EmailVerificationRequest,
-    ResendVerificationRequest
+    ResendVerificationRequest,
+    PasswordResetRequest,
+    PasswordResetVerification
 )
 from fastapi.responses import JSONResponse
 from db.models import pwd_context, Feedback
 from utils.auth import get_current_user, create_session, end_session
 from utils.file_handler import save_image, delete_file
-from utils.email_sender import generate_otp, send_verification_email
+from utils.email_sender import generate_otp, send_verification_email, send_password_reset_email
 import json
 from datetime import datetime, date, timedelta
 from sqlalchemy import desc
@@ -109,6 +111,32 @@ async def send_verification_otp(email: str, db: Session):
     except Exception as e:
         db.rollback()
         print(f"Error sending verification email: {e}")
+
+async def send_password_reset_otp(email: str, db: Session):
+    """Generate and send a password reset OTP to the user's email"""
+    
+    # Generate a 6-digit OTP
+    otp = generate_otp(6)
+    
+    # Set expiration time (10 minutes from now)
+    expires_at = datetime.now() + timedelta(minutes=10)
+    
+    # Create OTP record in database
+    verification_otp = VerificationOTP(
+        email=email,
+        otp=otp,
+        expires_at=expires_at
+    )
+    
+    # Save to database
+    db.add(verification_otp)
+    try:
+        db.commit()
+        # Send password reset email with OTP
+        send_password_reset_email(email, otp)
+    except Exception as e:
+        db.rollback()
+        print(f"Error sending password reset email: {e}")
 
 @router.post('/verify-email')
 async def verify_email(data: EmailVerificationRequest, db: Session = Depends(get_db)):
@@ -932,6 +960,86 @@ async def resend_verification(data: ResendVerificationRequest, db: Session = Dep
     await send_verification_otp(user.email, db)
     
     return {"message": "Verification code sent. Please check your email."}
+
+@router.post('/request-password-reset')
+async def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Send password reset OTP to user's email"""
+    
+    # Find the user by email
+    user = db.query(User).filter(User.email == data.email).first()
+    
+    if not user:
+        # For security reasons, don't reveal if email exists or not
+        return {"message": "If your email is registered with us, you will receive a password reset code shortly."}
+    
+    # Send password reset OTP
+    await send_password_reset_otp(user.email, db)
+    
+    return {"message": "If your email is registered with us, you will receive a password reset code shortly."}
+
+@router.post('/reset-password')
+async def reset_password(data: PasswordResetVerification, db: Session = Depends(get_db)):
+    """Reset user password using OTP verification"""
+    
+    # Check if passwords match
+    if data.new_password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match"
+        )
+    
+    # Check password length
+    if len(data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    
+    # Find the latest OTP for this email that hasn't been used
+    verification = db.query(VerificationOTP).filter(
+        VerificationOTP.email == data.email,
+        VerificationOTP.is_used == False
+    ).order_by(desc(VerificationOTP.created_at)).first()
+    
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No valid password reset code found for this email"
+        )
+    
+    if not verification.is_valid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset code has expired. Please request a new one."
+        )
+    
+    if verification.otp != data.otp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid password reset code"
+        )
+    
+    # Find the user
+    user = db.query(User).filter(User.email == data.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Mark OTP as used
+    verification.mark_as_used()
+    
+    # Update user's password
+    user.set_password(data.new_password)
+    
+    try:
+        db.commit()
+        return {"message": "Password reset successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/verification-status")
 async def check_verification_status(current_user: User = Depends(get_current_user)):

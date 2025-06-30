@@ -103,4 +103,30 @@ class ResendVerificationRequest(BaseModel):
             "example": {
                 "email": "user@example.com"
             }
+        }
+
+class PasswordResetRequest(BaseModel):
+    email: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "user@example.com"
+            }
+        }
+
+class PasswordResetVerification(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+    confirm_password: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "user@example.com",
+                "otp": "123456",
+                "new_password": "newpassword123",
+                "confirm_password": "newpassword123"
+            }
         } 

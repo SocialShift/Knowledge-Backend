@@ -100,6 +100,33 @@ def send_verification_email(to_email, otp):
     
     return send_email(to_email, subject, body)
 
+def send_password_reset_email(to_email, otp):
+    """
+    Send a password reset email with OTP
+    
+    Args:
+        to_email: Recipient email address
+        otp: One-time password for password reset
+        
+    Returns:
+        bool: True if email was sent successfully, False otherwise
+    """
+    subject = "Reset Your Password"
+    body = f"""
+    <html>
+    <body>
+        <h2>Password Reset Request</h2>
+        <p>We received a request to reset your password. Please use the following verification code to reset your password:</p>
+        <h1 style="font-size: 24px; background-color: #f0f0f0; padding: 10px; text-align: center;">{otp}</h1>
+        <p>This code will expire in 10 minutes.</p>
+        <p><strong>If you didn't request this password reset, please ignore this email and your password will remain unchanged.</strong></p>
+        <p>For security reasons, this code can only be used once.</p>
+    </body>
+    </html>
+    """
+    
+    return send_email(to_email, subject, body)
+
 def main():
     """CLI interface for testing email functionality"""
     parser = argparse.ArgumentParser(description='Send test emails via command line')
