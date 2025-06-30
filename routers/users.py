@@ -196,7 +196,7 @@ async def login(request: Request, data: LoginModel, db: Session = Depends(get_db
     
     if not user or not user.verify_password(data.password):
         return JSONResponse(
-            {'detail': "Invalid or password is invalid"},
+            {'detail': "Invalid email or password is invalid"},
             status_code= status.HTTP_401_UNAUTHORIZED
             )
     
