@@ -559,6 +559,7 @@ async def get_profile(
         "profile": {
             "id": profile.id,
             "nickname": profile.nickname,
+            "badges": profile.badges,
             "avatar_url": profile.avatar_url,
             "points": profile.points,
             "referral_code": profile.referral_code,
