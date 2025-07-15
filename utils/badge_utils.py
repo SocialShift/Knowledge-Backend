@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
-from db.models import Profile, UserStoryView, UserTimelineView, QuizAttempt, StandAloneGameAttempt, User
+from db.models import Profile, UserStoryView, UserTimelineView, QuizAttempt, StandAloneGameAttempt, StandAloneGameQuestion, User
 from sqlalchemy import func, text
 
 # Badge path constants
@@ -225,9 +225,11 @@ def get_user_progress(user_id: int, db: Session) -> Dict[str, Any]:
     ).count()
     
     # Get different game types played
-    game_types_played = db.query(func.count(func.distinct(text('sg.game_type')))).select_from(
-        text('stand_alone_game_attempts sa JOIN stand_alone_game_questions sg ON sa.game_id = sg.id')
-    ).filter(text('sa.user_id = :user_id')).params(user_id=user_id).scalar() or 0
+    game_types_played = db.query(func.count(func.distinct(StandAloneGameQuestion.game_type))).select_from(
+        StandAloneGameAttempt
+    ).join(
+        StandAloneGameQuestion, StandAloneGameAttempt.game_id == StandAloneGameQuestion.id
+    ).filter(StandAloneGameAttempt.user_id == user_id).scalar() or 0
     
     # Get current streak
     profile = db.query(Profile).filter(Profile.user_id == user_id).first()
