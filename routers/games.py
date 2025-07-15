@@ -319,7 +319,22 @@ async def submit_game_attempt(
         profile.points += 5  # Award 5 points for correct answers
         db.commit()
     
-    return new_attempt
+    from utils.badge_utils import evaluate_badge_progress
+    badge_updates = evaluate_badge_progress(current_user.id, db)
+    
+    response = {
+        "id": new_attempt.id,
+        "user_id": new_attempt.user_id,
+        "game_id": new_attempt.game_id,
+        "selected_option_id": new_attempt.selected_option_id,
+        "is_correct": new_attempt.is_correct,
+        "created_at": new_attempt.created_at
+    }
+    
+    if badge_updates and badge_updates['newly_earned_badges']:
+        response['badge_updates'] = badge_updates
+    
+    return response
 
 # Get user's game attempts
 @router.get("/attempts", response_model=List[GameAttempt])

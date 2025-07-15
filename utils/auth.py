@@ -78,6 +78,11 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
                 # Store the bonus in the session so we can display it to the user
                 request.session["streak_bonus"] = streak_bonus
                 request.session["current_streak"] = profile.current_login_streak
+            from utils.badge_utils import evaluate_badge_progress
+            badge_updates = evaluate_badge_progress(user.id, db)
+            
+            if badge_updates and badge_updates['newly_earned_badges']:
+                request.session["badge_updates"] = badge_updates
             # Save changes
             db.commit()
     return user

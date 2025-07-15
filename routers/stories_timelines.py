@@ -250,6 +250,7 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
         UserTimelineView.timeline_id == timeline_id
     ).first()
     
+    badge_updates = None
     if not user_timeline_view:
         # Create new view record
         user_timeline_view = UserTimelineView(
@@ -259,6 +260,8 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
             viewed_at=datetime.utcnow()
         )
         db.add(user_timeline_view)
+        from utils.badge_utils import evaluate_badge_progress
+        badge_updates = evaluate_badge_progress(current_user.id, db)
     
     # Check if timeline is bookmarked
     bookmark = db.query(UserTimelineBookmark).filter(
@@ -295,6 +298,8 @@ async def get_timeline(timeline_id: int, db: Session= Depends(get_db), current_u
         "bookmarked": bookmark is not None
     }
     
+    if badge_updates and badge_updates['newly_earned_badges']:
+        response['badge_updates'] = badge_updates
     return response
 
 @router.get('/list/timelines')
@@ -697,6 +702,7 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
         UserStoryView.story_id == story_id
     ).first()
     
+    badge_updates = None
     if not user_story_view:
         # Create new view record
         user_story_view = UserStoryView(
@@ -711,6 +717,8 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
         profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
         if profile:
             profile.points += 5  # 5 points for first time viewing a story
+        from utils.badge_utils import evaluate_badge_progress
+        badge_updates = evaluate_badge_progress(current_user.id, db)
     
     db.commit()  # Commit the changes to the database
     
@@ -743,6 +751,8 @@ async def get_story(story_id: int, db: Session= Depends(get_db), current_user: U
         ]
     }
     
+    if badge_updates and badge_updates['newly_earned_badges']:
+        response['badge_updates'] = badge_updates
     return response
 
 @router.get('/list/stories')
@@ -1286,15 +1296,23 @@ async def submit_quiz(
             quiz_attempt.score = total_points_earned
             quiz_attempt.completed_at = datetime.utcnow()
         
+        from utils.badge_utils import evaluate_badge_progress
+        badge_updates = evaluate_badge_progress(current_user.id, db)
         db.commit()
         
-        return {
+        response = {
             "total_questions": total_questions,
             "correct_answers": correct_answers,
             "points_earned": total_points_earned,
             "completion_bonus": completion_bonus,
             "new_total_points": profile.points
         }
+        
+        # Add badge updates if there are any newly earned badges
+        if badge_updates and badge_updates['newly_earned_badges']:
+            response['badge_updates'] = badge_updates
+        
+        return response
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))

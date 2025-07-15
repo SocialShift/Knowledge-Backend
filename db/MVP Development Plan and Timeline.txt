@@ -1,0 +1,291 @@
+	🔍 Overview
+This document outlines the backend structure, badge logic, and UI integration points for implementing Know[ledge]'s gamified badge system. The primary badge track is called the Illumination Path, which reflects a user’s progression through uncovering erased stories and completing topic arcs. Additional badge paths include games, reflections, identity-based exploration, and community engagement.
+________________
+
+
+🛠️ Badge Architecture
+📊 Data Models
+Badge
+Badge {
+  id: string,
+  name: string,
+  path: string, // illumination, arc, reflection, game, etc.
+  criteria: object, // e.g., {stories_completed: 25, arcs_completed: 2}
+  tier: string, // e.g., "1", "2", "3"
+  description: string,
+  icon_url: string,
+  is_pro_only: boolean
+}
+UserBadge
+UserBadge {
+  id: string,
+  user_id: string,
+  badge_id: string,
+  earned_at: datetime
+}
+UserProgress (Optional but Recommended)
+UserProgress {
+  user_id: string,
+  stories_completed: int,
+  arcs_completed: int,
+  streak_days: int,
+  reflections_completed: int,
+  identity_categories_explored: [string],
+  games_played: int,
+  quiz_scores: [int]
+}
+________________
+
+
+🌟 Badge Themes
+Badge Type
+	Description
+	Purpose
+	Illumination Badges
+	Uncovering stories/timelines
+	Reflects personal growth and commitment to learning erased histories
+	Progression Badges
+	Milestone-based achievements
+	Encourages continued use and tiered mastery
+	Resistance Badges
+	Completing arcs related to protest and survival
+	Honors activism and resilience
+	Allyship Badges
+	Exploring identities beyond user's own
+	Reinforces empathy and cross-cultural learning
+	Echo Badges
+	Sharing content, inviting users, writing reflections
+	Community amplification
+	Streak/Consistency Badges
+	Daily use or learning streaks
+	Habit formation and learning discipline
+	Game-Based Badges
+	For interactive learning via games
+	Engagement + challenge-based rewards
+	Seasonal/Event Badges
+	Timed arcs (e.g. Pride, BHM)
+	Urgency, relevance, and social participation
+	________________
+
+
+🔦 Illumination Path - Main Progression Badges
+Retention Requirement: To maintain your current Illumination Path badge status, users must either complete at least one qualifying task — such as completing a story, finishing an arc, or passing a milestone quiz — per week or continue leveling up. If no qualifying activity occurs within a 7-day period, the badge reverts to the previous tier until re-earned.
+
+
+This is the linear badge track based on story and arc completion, reflecting a user's growth as a truth-seeker and knowledge keeper.
+Tier
+	Badge
+	Criteria
+	Meaning
+	1
+	Spark
+	3 stories
+	You’ve taken the first step into untold truths
+	2
+	Candlebearer
+	10 stories
+	You're starting to light the darkness with knowledge
+	3
+	Torchbearer
+	25 stories
+	You carry the truth forward, one story at a time
+	4
+	Flamekeeper
+	50 stories + 2 timelines
+	You protect what others tried to extinguish
+	5
+	Beacon
+	100 stories + 5 timelines
+	You shine so others can see. Your knowledge guides generations
+	6
+	Constellation
+	All timelines in 3+ identity categories (Pro only)
+	You've connected erased histories across communities
+	Use shared constant:
+const BADGE_PATH_ILLUMINATION = 'illumination';
+________________
+
+
+🎮 Game Badge Progression (Early Design)[a]
+Retention Requirement: To maintain progress in the Game Badge Path, users must complete at least one game per week or continue leveling up. If no game is played within a 7-day period, their current Game Badge status will be paused (badge dims or locks until reactivation).
+Level
+	Badge
+	Criteria
+	1
+	Uncover
+	Play 1 game of any type
+	2
+	Seeker
+	Play 3 different game types
+	3
+	Revealer
+	Score 80%+ on 3 games
+	4
+	Historian
+	Play 10 total games
+	5
+	Archivist
+	Complete all games in a challenge set (weekly/monthly)
+	Games should include metadata (game_type) to support filtering and badge triggers.
+Additionally, seasonal or rotating Challenge Sets may offer limited-time bonus badges tied to Game Mastery or speed runs (e.g., complete 5 games during Black History Month Challenge).
+________________
+
+
+📚 Supporting Badge Tracks
+Track
+	Badge Series
+	Example Levels
+	Backend Data Field 
+	Story Engagement
+	The Storykeeper Path
+	Page Turner (10) → Archivist (25)  → Historian (50) → Keeper of Memory (100)
+	stories_completed counter on UserProgress
+	Timeline Learning
+	The Traveler Path
+	Scout → Pathfinder → Historian → Guardian of Continuity
+	timelines_completed counter on UserProgress
+	Reflection Practice
+	The Reflector Path
+	Listener → Mirror → Insight Giver → Wisdom Weaver
+	reflections_completed counter on UserProgress
+	Cross-Identity Exploration
+	The Allyship Path
+	Observer → Bridge Builder → Empathy Embodied
+	identity_categories_explored array on UserProgress
+	Daily Commitment
+	The Continuum Path
+	Ember (3-day streak) → Flame (7) → Inferno (30) → Eternal Flame (90)
+	streak_days field (based on onLogin + onActivity)
+	Social Sharing (Messenger, Amplifier, etc.)
+
+
+	The Mover Path
+	Messenger → Amplifier → Story Shaper        
+	shares_completed field (NEW metric)
+	
+
+🔄 Trigger & Evaluation Logic
+Events to Track:
+* onStoryComplete()
+* onTimelineComplete()
+* onLogin() (for streaks)
+* onGameComplete() (future)
+* onReflectionSubmit() (future)
+Badge Evaluation Function
+evaluateBadgeProgress(user_id: string): void
+* Triggered on content or login events
+* Checks user progress and badge unlocks
+* Writes new UserBadge if criteria met
+* Sends unlock payload to frontend
+________________
+
+
+📲 Frontend Integration
+Badge Unlock UX
+* Show animated modal with badge icon, name, and description
+* Add badge to grid on profile
+* Optional glow-up for badge tiers (e.g., Spark → Torchbearer)
+Components
+* UserBadgeGrid
+* BadgeUnlockDialog
+* BadgeTeaserProgressBar
+________________
+
+
+🔐 Pro-Only Badge Handling
+* is_pro_only: true badges locked unless user is subscribed
+* On unlock event or upgrade trigger, show motivational messaging:
+“You’re one of few to earn Constellation. You’ve built a living archive.”
+________________
+
+
+
+
+
+
+Appendix - Don’t use anything below
+
+
+🏛️ Know[ledge] Gamified Badge Framework
+“Learning is power. Badges are not just rewards — they are reflections of identity, impact, and illumination.”
+🔦 CORE BADGE THEMES
+Badge Type
+	Description
+	What It Reinforces
+	Illumination Badges
+	Earned for uncovering erased stories, completing timelines, or using Spotlights
+	Discovery, curiosity, dedication
+	Progression Badges
+	Tiered titles that track your journey from learner to wisdom-holder
+	Growth, transformation, mastery
+	Resistance Badges
+	Completing arcs about struggle, survival, protest, and movements
+	Honoring history, resilience
+	Allyship Badges
+	Learning outside your own lived experience
+	Empathy, social solidarity
+	Echo Badges
+	Sharing stories, reflections, or inviting others
+	Amplification, community impact
+	Streak/Consistency Badges
+	Learning consistently (e.g., 7-day streaks)
+	Commitment, legacy-building
+	Limited-Time/Seasonal Badges
+	Completing time-sensitive arcs (e.g., Black History Month)
+	Urgency, community participation
+	Pro-Only Mastery Badges
+	Unlocking premium arcs and deeper learning paths
+	Premium value, lifelong learning
+	________________
+
+
+🔐 PRO-ONLY BADGE EXAMPLES
+Badge
+	Criteria
+	Value
+	Erasure Fighter
+	Complete 5 premium arcs on censored/banned topics
+	You refuse historical erasure. You bring truth forward.
+	Deep Diver
+	Complete all content in a single identity category
+	Mastery in focus, self-guided learning
+	Echo Chamber Breaker
+	Learn across 5+ identities
+	You've broken historical silos and embraced complexity.
+	________________
+
+
+💬 EXAMPLE IN-APP MESSAGING
+🎉 Badge Unlocked: Torchbearer
+ You’ve completed 25 erased stories. You carry their voices with you — keep going.
+🔥 7-Day Streak: You’re now a Flame.
+ Your consistency keeps truth alive. Protect your streak and level up to Inferno.
+📖 You've earned the Bridge Builder badge.
+ You’ve stepped beyond your story and into someone else’s truth. That’s how empathy grows.
+________________
+
+
+🧩 FEATURES TO SUPPORT GAMIFICATION
+Feature
+	Purpose
+	Badge Showcase
+	Users choose 3 badges to display on their profile/home screen
+	Progress Bar Animations
+	Show % to next badge with visual glow (motivation loop)
+	Badge Library
+	Grid of earned and locked badges to drive curiosity and collection
+	Seasonal/Challenge Badges
+	Special arcs (e.g., Pride Month) that expire to drive urgency
+	Social Prompts
+	“Share your Torchbearer badge and invite others to light up history”
+	________________
+
+
+🧠 FINAL NOTE: WHY THIS MATTERS
+This isn’t gamification for fluff.
+It’s identity reinforcement.
+It’s social proof of awareness.
+It’s a visible commitment to unlearning and re-learning history with intention.
+
+
+[a]@soulpiyush09@gmail.com - here's the game badges

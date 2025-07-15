@@ -386,6 +386,10 @@ async def get_profile(
     if streak_bonus:
         request.session.pop("streak_bonus", None)
     
+    badge_updates = request.session.get("badge_updates", None)
+    if badge_updates:
+        request.session.pop("badge_updates", None)
+    
     # Get followers and following counts
     followers_count = db.query(UserFollow).filter(UserFollow.followed_id == profile.id).count()
     following_count = db.query(UserFollow).filter(UserFollow.follower_id == profile.id).count()
