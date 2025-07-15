@@ -65,8 +65,7 @@ ILLUMINATION_BADGES = [
         'tier': '6',
         'criteria': {'timelines_completed_across_categories': 3},
         'description': "You've connected erased histories across communities",
-        'icon_url': 'media/badges/constellation.png',
-        'is_pro_only': True
+        'icon_url': 'media/badges/constellation.png'
     }
 ]
 
@@ -159,8 +158,30 @@ STREAK_BADGES = [
     }
 ]
 
+# Default starter badges that everyone gets
+DEFAULT_BADGES = [
+    {
+        'id': 'truth_seeker',
+        'name': 'Truth Seeker',
+        'path': 'starter',
+        'tier': '0',
+        'criteria': {},  # No criteria - given by default
+        'description': "Welcome to Knowledge. Your journey to uncover hidden truths begins now.",
+        'icon_url': 'media/badges/truth_seeker.png'
+    },
+    {
+        'id': 'first_step',
+        'name': 'First Step',
+        'path': 'starter',
+        'tier': '0',
+        'criteria': {},  # No criteria - given by default
+        'description': "Every journey begins with a single step. You've taken yours.",
+        'icon_url': 'media/badges/first_step.png'
+    }
+]
+
 # All badges combined
-ALL_BADGES = ILLUMINATION_BADGES + GAME_BADGES + STREAK_BADGES
+ALL_BADGES = ILLUMINATION_BADGES + GAME_BADGES + STREAK_BADGES + DEFAULT_BADGES
 
 def get_user_progress(user_id: int, db: Session) -> Dict[str, Any]:
     """Calculate user progress for badge evaluation"""
@@ -299,18 +320,11 @@ def update_user_badges(user_id: int, db: Session) -> List[Dict[str, Any]]:
     if not profile:
         return []
     
-    # Check if user is premium (for pro-only badges)
-    is_premium = profile.is_premium
-    
     newly_earned_badges = []
     updated_badges = []
     
     # Process each badge
     for badge in ALL_BADGES:
-        # Skip pro-only badges for non-premium users
-        if badge.get('is_pro_only', False) and not is_premium:
-            continue
-            
         badge_earned = check_badge_earned(badge, progress)
         
         if badge_earned and badge['id'] not in current_badge_ids:
@@ -389,3 +403,74 @@ def evaluate_badge_progress(user_id: int, db: Session) -> Dict[str, Any]:
         'progress': progress,
         'unlock_messages': [get_badge_unlock_message(badge) for badge in newly_earned_badges]
     } 
+
+def get_default_badges() -> List[Dict[str, Any]]:
+    """Get default badges that should be given to all new users"""
+    default_badges = []
+    
+    for badge in DEFAULT_BADGES:
+        earned_badge = {
+            'id': badge['id'],
+            'name': badge['name'],
+            'path': badge['path'],
+            'tier': badge['tier'],
+            'description': badge['description'],
+            'icon_url': badge['icon_url'],
+            'earned_at': datetime.utcnow().isoformat()
+        }
+        default_badges.append(earned_badge)
+    
+    return default_badges
+
+def initialize_user_badges(user_id: int, db: Session) -> List[Dict[str, Any]]:
+    """Initialize badges for a new user with default starter badges"""
+    # Get user profile
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if not profile:
+        return []
+    
+    # Set default badges
+    default_badges = get_default_badges()
+    profile.badges = default_badges
+    db.commit()
+    
+    return default_badges 
+
+def ensure_default_badges(user_id: int, db: Session) -> List[Dict[str, Any]]:
+    """Ensure user has default badges - give them if they don't have any badges yet"""
+    # Get user profile
+    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if not profile:
+        return []
+    
+    # If user has no badges, give them default ones
+    if not profile.badges or len(profile.badges) == 0:
+        default_badges = get_default_badges()
+        profile.badges = default_badges
+        db.commit()
+        return default_badges
+    
+    # Check if user has default badges, if not add them
+    current_badge_ids = {badge['id'] for badge in profile.badges}
+    missing_default_badges = []
+    
+    for default_badge in DEFAULT_BADGES:
+        if default_badge['id'] not in current_badge_ids:
+            earned_badge = {
+                'id': default_badge['id'],
+                'name': default_badge['name'],
+                'path': default_badge['path'],
+                'tier': default_badge['tier'],
+                'description': default_badge['description'],
+                'icon_url': default_badge['icon_url'],
+                'earned_at': datetime.utcnow().isoformat()
+            }
+            missing_default_badges.append(earned_badge)
+    
+    # Add missing default badges
+    if missing_default_badges:
+        profile.badges.extend(missing_default_badges)
+        db.commit()
+        return missing_default_badges
+    
+    return [] 

@@ -67,6 +67,11 @@ async def create_user(request: Request, data: UserCreateModel, db: Session = Dep
     try:
         db.commit()
         db.refresh(new_profile)
+        
+        # Initialize default badges for new user
+        from utils.badge_utils import initialize_user_badges
+        initialize_user_badges(new_user.id, db)
+        
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -360,6 +365,10 @@ async def get_profile(
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Ensure user has default badges
+    from utils.badge_utils import ensure_default_badges
+    ensure_default_badges(current_user.id, db)
     
     # Calculate user rank
     higher_ranked_count = db.query(Profile).filter(Profile.points > profile.points).count()
