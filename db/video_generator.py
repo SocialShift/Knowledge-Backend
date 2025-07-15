@@ -61,25 +61,75 @@ def generate_audio(client, file_path, prompt, tone="speak in a positive tone"):
         if len(prompt) > 2000:
             prompt = prompt[:2000]
 
-        # Generate the audio
+        # Add tone instruction to the prompt itself since instructions parameter doesn't exist
+        enhanced_prompt = f"{tone}: {prompt}"
+
+        # Generate the audio (OpenAI TTS outputs in MP3 format by default)
+        # Convert Path to string and then do string replacement
+        temp_mp3_path = str(file_path).replace('.aac', '.mp3').replace('.m4a', '.mp3')
         with client.audio.speech.with_streaming_response.create(
             model="tts-1",
             voice="alloy",
-            input=prompt,
-            instructions=tone
+            input=enhanced_prompt
         ) as response:
-            response.stream_to_file(file_path)
+            response.stream_to_file(temp_mp3_path)
         
-        # Get audio duration in milliseconds
+        # Convert to M4A for better mobile compatibility
         from pydub import AudioSegment
-        audio = AudioSegment.from_file(file_path)
-        return len(audio)
+        audio = AudioSegment.from_mp3(temp_mp3_path)
+        
+        # Use M4A format for better mobile compatibility (works on both iOS and Android)
+        if str(file_path).endswith('.m4a'):
+            m4a_path = str(file_path)
+        else:
+            m4a_path = str(file_path).replace('.aac', '.m4a')
+        
+        # Export as M4A with optimized settings for mobile
+        audio.export(
+            m4a_path, 
+            format="mp4", 
+            codec="aac",
+            bitrate="128k",  # Good quality for mobile
+            parameters=["-movflags", "faststart"]  # Optimize for streaming
+        )
+        
+        # Keep the original MP3 as backup (MP3 is universally supported)
+        mp3_backup_path = m4a_path.replace('.m4a', '.mp3')
+        if temp_mp3_path != mp3_backup_path:
+            import shutil
+            shutil.copy2(temp_mp3_path, mp3_backup_path)
+        
+        # Clean up temporary MP3 file if it's different from backup
+        if os.path.exists(temp_mp3_path) and temp_mp3_path != mp3_backup_path:
+            os.remove(temp_mp3_path)
+        
+        # Return audio duration in milliseconds and the actual file path
+        return len(audio), m4a_path
     except Exception as e:
         print(f"Error generating audio: {e}")
-        # Create an empty audio file
+        # Create an empty audio file in M4A format
+        from pydub import AudioSegment
         empty_audio = AudioSegment.silent(duration=3000)  # 3 seconds of silence
-        empty_audio.export(file_path, format="aac")
-        return 3000  # Return 3000ms
+        if str(file_path).endswith('.m4a'):
+            m4a_path = str(file_path)
+        else:
+            m4a_path = str(file_path).replace('.aac', '.m4a')
+        
+        try:
+            empty_audio.export(
+                m4a_path, 
+                format="mp4", 
+                codec="aac",
+                bitrate="128k",
+                parameters=["-movflags", "faststart"]
+            )
+        except:
+            # If M4A fails, fallback to MP3 (most universally supported)
+            mp3_path = m4a_path.replace('.m4a', '.mp3')
+            empty_audio.export(mp3_path, format="mp3")
+            return 3000, mp3_path
+        
+        return 3000, m4a_path  # Return 3000ms and the file path
 
 def save_image(image_url, output_path):
     """Save image from URL to file."""
@@ -194,9 +244,9 @@ def create_video(client, topic, output_dir):
         audio_paths = []
         durations = []
         for step in story.steps:
-            audio_path = story_dir / f"step-{step.number_id}.aac"
-            duration = generate_audio(client, audio_path, step.text, step.tone)
-            audio_paths.append(str(audio_path))
+            audio_path = story_dir / f"step-{step.number_id}.m4a"
+            duration, actual_audio_path = generate_audio(client, audio_path, step.text, step.tone)
+            audio_paths.append(str(actual_audio_path))
             durations.append(duration)
         
         # Create video clips
@@ -216,7 +266,22 @@ def create_video(client, topic, output_dir):
                     # Create a silent audio clip if it doesn't exist
                     from pydub import AudioSegment
                     silent = AudioSegment.silent(duration=3000)
-                    silent.export(audio_paths[i], format="aac")
+                    # Use M4A format for better mobile compatibility
+                    m4a_path = audio_paths[i].replace('.aac', '.m4a')
+                    try:
+                        silent.export(
+                            m4a_path, 
+                            format="mp4", 
+                            codec="aac",
+                            bitrate="128k",
+                            parameters=["-movflags", "faststart"]
+                        )
+                        audio_paths[i] = m4a_path
+                    except:
+                        # Fallback to MP3 if M4A fails
+                        mp3_path = m4a_path.replace('.m4a', '.mp3')
+                        silent.export(mp3_path, format="mp3")
+                        audio_paths[i] = mp3_path
                     duration_sec = 3
                 
                 # Create image clip with audio
@@ -243,7 +308,14 @@ def create_video(client, topic, output_dir):
         # Concatenate clips and create final video
         final_video = concatenate_videoclips(video_clips)
         video_output_path = story_dir / f"{story_id}.mp4"
-        final_video.write_videofile(str(video_output_path), fps=24, codec="libx264", audio_codec="aac")
+        final_video.write_videofile(
+            str(video_output_path), 
+            fps=24, 
+            codec="libx264", 
+            audio_codec="aac",
+            temp_audiofile="temp-audio.m4a",
+            remove_temp=True
+        )
         
         return {
             "story_id": story_id,
@@ -270,7 +342,14 @@ def create_video(client, topic, output_dir):
         
         img_clip = ImageClip(str(fallback_path)).with_duration(5)
         video_output_path = story_dir / f"{story_id}.mp4"
-        img_clip.write_videofile(str(video_output_path), fps=24, codec="libx264", audio_codec="aac")
+        img_clip.write_videofile(
+            str(video_output_path), 
+            fps=24, 
+            codec="libx264", 
+            audio_codec="aac",
+            temp_audiofile="temp-audio.m4a",
+            remove_temp=True
+        )
         
         return {
             "story_id": story_id,
