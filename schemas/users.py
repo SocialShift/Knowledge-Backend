@@ -32,6 +32,7 @@ class ProfileUpdate(BaseModel):
     pronouns: str = None
     location: str = None
     personalization_questions: dict = None
+    is_premium: bool = None
     
     class Config:
         arbitrary_types_allowed = True

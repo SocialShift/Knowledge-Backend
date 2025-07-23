@@ -233,6 +233,7 @@ async def update_profile(
     pronouns: str = Form(None),
     location: str = Form(None),
     personalization_questions: str = Form(None),
+    is_premium: bool = Form(None),
     avatar_file: UploadFile = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -251,6 +252,8 @@ async def update_profile(
         update_data["pronouns"] = pronouns
     if location is not None:
         update_data["location"] = location
+    if is_premium is not None:
+        update_data["is_premium"] = is_premium
     
     # Parse personalization questions if provided
     if personalization_questions is not None:
