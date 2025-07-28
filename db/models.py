@@ -207,6 +207,10 @@ class User(Base):
     
     # Feedback relationship
     feedback = relationship("Feedback", back_populates="user", cascade="all, delete-orphan")
+    
+    # Reports relationships - explicitly define to ensure proper cascade
+    submitted_reports = relationship("Report", foreign_keys="Report.reporter_id", cascade="all, delete-orphan")
+    reviewed_reports = relationship("Report", foreign_keys="Report.reviewed_by")
 
     def verify_password(self, plain_password):
         return pwd_context.verify(plain_password, self.password)
@@ -267,7 +271,7 @@ class Profile(Base):
         return "".join([str(random.randint(0, 9)) for _ in range(6)])
     
     def __repr__(self):
-        return self.nickname
+        return self.nickname or f"Profile {self.id}"
 
 class OnThisDay(Base):
     __tablename__ = "on_this_day"
@@ -651,8 +655,8 @@ class Report(Base):
     reviewed_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     
     # Relationships
-    reporter = relationship("User", foreign_keys=[reporter_id], backref="submitted_reports")
-    reviewer = relationship("User", foreign_keys=[reviewed_by], backref="reviewed_reports")
+    reporter = relationship("User", foreign_keys=[reporter_id], overlaps="submitted_reports")
+    reviewer = relationship("User", foreign_keys=[reviewed_by], overlaps="reviewed_reports")
     
     def __repr__(self):
         return f"Report {self.id}: {self.report_type} #{self.reported_item_id} by User {self.reporter_id}"
